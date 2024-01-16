@@ -4,6 +4,7 @@ import { ethers } from "ethers";
 import { SQLiteDatabase } from "./sqlite";
 import fs from 'fs';
 import fetch from 'fetch';
+import { tokenDataRequest } from "./tokenDiscovery";
 
 import { CHAIN_CONFIG, CONTRACT_CONFIG, PATH_TO_CERT, SQLite_DB_FILE } from "./constants";
 
@@ -40,22 +41,12 @@ await app.register(cors, {
 app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
-  if (!recordKey || !recordName) return;
-
+  if (!recordKey || !recordName) return "";
+  const { addr } = db.addr(recordName, 0x80000089);
   const chainIdentifier = 137;
-  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, recordName);
-
-  let tokenData;
-
-  try {
-    const tokenReq = await fetch(`https://resources.smarttokenlabs.com/${chainId}/${tokenContract}/${tokenId}`);
-    tokenData = await tokenImageReq.toJson();
-  } catch {
-    return "";
-  }
-
+  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
+  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId)
   if (!tokenData) return "";
-
   switch (recordKey.toLowerCase()) {
     case 'avatar':
       return tokenReqJson.image ? tokenReqJson.image : "";
