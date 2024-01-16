@@ -3,11 +3,12 @@ import fastify from "fastify";
 import { ethers } from "ethers";
 import { SQLiteDatabase } from "./sqlite";
 import fs from 'fs';
+import fetch from 'fetch';
 
 import { CHAIN_CONFIG, CONTRACT_CONFIG, PATH_TO_CERT, SQLite_DB_FILE } from "./constants";
 
 import cors from '@fastify/cors';
-import { getTokenBoundAccount } from "./tokenBound";
+import { getTokenBoundAccount, getTokenBoundNFT } from "./tokenBound";
 
 const db: SQLiteDatabase = new SQLiteDatabase(
   SQLite_DB_FILE, // e.g. 'ensnames.db'
@@ -35,6 +36,34 @@ if (PATH_TO_CERT) {
 await app.register(cors, {
   origin: true
 })
+
+app.get('/text/:name/:key', async (request, reply) => {
+  const recordName = request.params.name;
+  const recordKey = request.params.key; // e.g. Avatar
+  if (!recordKey || !recordName) return;
+
+  const chainIdentifier = 137;
+  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, recordName);
+
+  let tokenData;
+
+  try {
+    const tokenReq = await fetch(`https://resources.smarttokenlabs.com/${chainId}/${tokenContract}/${tokenId}`);
+    tokenData = await tokenImageReq.toJson();
+  } catch {
+    return "";
+  }
+
+  if (!tokenData) return "";
+
+  switch (recordKey.toLowerCase()) {
+    case 'avatar':
+      return tokenReqJson.image ? tokenReqJson.image : "";
+    default:
+      const tokenDataValue = tokenData[recordKey];
+      return tokenDataValue ? tokenDataValue : "";
+  }
+});
 
 app.get('/checkname/:name', async (request, reply) => {
   const name = request.params.name;
