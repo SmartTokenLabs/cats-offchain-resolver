@@ -59,8 +59,27 @@ await app.register(cors, {
 async function getTokenImage(name: string, tokenId: number) {
   //TODO: lookup token contract and chainId from database, given the name.
   //      You would store the avatar URL at creation time
+  //get domain
+  let parsed = ethers.utils.namehash(name);
+  let strippedName = ethers.utils.parseName(parsed);
+  console.log("Domain: " + strippedName);
+  var contractAddr;
+  var chainId;
 
-  //const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+  switch (name) {
+    case 'smartcat.eth':
+      contractAddr = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
+      chainId = 5;
+      break;
+    case 'thesmartcats.eth':
+      contractAddr = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
+      chainId = 5;
+      break;
+  }
+
+
+  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+
   return "";
 }
 
@@ -244,6 +263,17 @@ function addHexPrefix(hex: string): string {
 }*/
 
 async function calcAddress() {
+
+  const name = "bert.thesmartcats.eth";
+  let normalized = ethers.ensNormalize(name);
+  //let parsed = ethers.namehash(name);
+  let p1 = ethers.dnsEncode(name);
+
+  let parts = name.split('.');
+  let domain = parts.slice(1).join('.');
+
+  // let strippedName = ethers.parseName(parsed);
+  console.log("NAME: " + p1 + " : " + domain);
 
   const chainIdentifier: number = 5;
   const contractAddress = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";

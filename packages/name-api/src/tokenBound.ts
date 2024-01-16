@@ -26,7 +26,7 @@ export function getTokenBoundAccount(chainId: number, tokenContract: `0x${string
 	return tbaClient.getAccount({ tokenContract, tokenId });
 }
 
-
+// Can only be used if user has set up a TBA account 
 export function getTokenBoundNFT(chainIdentifier: number, accountAddress: `0x${string}`) {
 
 	let chain = undefined;
