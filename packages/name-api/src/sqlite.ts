@@ -18,8 +18,24 @@ export class SQLiteDatabase {
         text TEXT,
         contenthash TEXT,
         chain_id INTEGER,
+        token_id INTEGER,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
+  }
+
+  initDb() {
+    const columnInfo = this.db.prepare("PRAGMA table_info(names)").all();
+    // @ts-ignore
+    const columnExists = columnInfo.some(column => column.name === 'token_id');
+
+    if (!columnExists) {
+      console.log("Column !exists");
+      this.db.exec(`
+      ALTER TABLE names
+      ADD COLUMN token_id INTEGER;`);
+    } else {
+      console.log("Column exists");
+    }
   }
 
   getAccountCount(): string {
@@ -42,6 +58,14 @@ export class SQLiteDatabase {
       useCoinType = 60;
     } else if (coinType == 60) {
       useCoinType = -1; 
+    } else if (coinType == 0) {
+      return { addr: "MQMcJhpWHYVeQArcZR3sBgyPZxxRtnH441" };
+    } else if (coinType == 2) {
+      return { addr: "12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S" };
+    } else if (coinType == 0x8000003d ) {
+      return { addr: "0x3fFB04c0065c97E165F94CC1AB3493da393C2D5F"};
+    } else if (coinType == 0x80000064 ) {
+      return { addr: "0x3fFB04c0065c97E165F94CC1AB3493da393C2D5F"};
     }
 
     if (!addresses || !addresses[useCoinType]) {
@@ -49,6 +73,16 @@ export class SQLiteDatabase {
     }
 
     return { addr: addresses[useCoinType] };
+  }
+
+  getTokenIdFromName(name: string): number {
+    const row = this.db.prepare('SELECT token_id FROM names WHERE name = ?').get(name.toLowerCase());
+    if (row) {
+      // @ts-ignore
+      return row.token_id;
+    } else {
+      return -1;
+    }
   }
 
   getNameFromAddress(address: string): string | null {
@@ -96,7 +130,7 @@ export class SQLiteDatabase {
     return !row;
   }
 
-  addElement(baseName: string, name: string, address: string, chainId: number) {
+  addElement(baseName: string, name: string, address: string, chainId: number, tokenId: number) {
     const santisedName = name.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
     const truncatedText = santisedName.slice(0, 42); // limit name to 255
 
@@ -110,7 +144,7 @@ export class SQLiteDatabase {
     const addresses = { 60: address };
     const contenthash = '0xe301017012204edd2984eeaf3ddf50bac238ec95c5713fb40b5e428b508fdbe55d3b9f155ffe';
 
-    const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id) VALUES (?, ?, ?, ?)');
-    stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId);
+    const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id, token_id) VALUES (?, ?, ?, ?, ?)');
+    stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId, tokenId);
   }
 }

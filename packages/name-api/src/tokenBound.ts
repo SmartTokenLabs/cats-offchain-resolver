@@ -27,7 +27,7 @@ export function getTokenBoundAccount(chainId: number, tokenContract: `0x${string
 }
 
 
-export function getTokenBoundNFT(chainIdentifier: number, accountAddress: any) {
+export function getTokenBoundNFT(chainIdentifier: number, accountAddress: `0x${string}`) {
 
 	let chain = undefined;
 

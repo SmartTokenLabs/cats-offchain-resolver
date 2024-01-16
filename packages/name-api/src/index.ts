@@ -3,8 +3,26 @@ import fastify from "fastify";
 import { ethers } from "ethers";
 import { SQLiteDatabase } from "./sqlite";
 import fs from 'fs';
-import fetch from 'fetch';
 import { tokenDataRequest } from "./tokenDiscovery";
+import fetch, {
+  Blob,
+  blobFrom,
+  blobFromSync,
+  File,
+  fileFrom,
+  fileFromSync,
+  FormData,
+  Headers,
+  Request,
+  Response,
+} from 'node-fetch'
+
+if (!globalThis.fetch) {
+  globalThis.fetch = fetch
+  globalThis.Headers = Headers
+  globalThis.Request = Request
+  globalThis.Response = Response
+}
 
 import { CHAIN_CONFIG, CONTRACT_CONFIG, PATH_TO_CERT, SQLite_DB_FILE } from "./constants";
 
@@ -38,18 +56,37 @@ await app.register(cors, {
   origin: true
 })
 
+async function getTokenImage(name: string, tokenId: number) {
+  //TODO: lookup token contract and chainId from database, given the name.
+  //      You would store the avatar URL at creation time
+
+  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+}
+
 app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
   if (!recordKey || !recordName) return "";
-  const { addr } = db.addr(recordName, 0x80000089);
-  const chainIdentifier = 137;
-  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
-  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId)
-  if (!tokenData) return "";
+  
   switch (recordKey.toLowerCase()) {
     case 'avatar':
-      return tokenReqJson.image ? tokenReqJson.image : "";
+      const { tokenId } = db.getTokenIdFromName(recordName);
+      if (tokenId == -1) {
+        return "";
+      } else {
+        return getTokenImage(recordName, tokenId);
+
+      }
+      const { addr } = db.addr(recordName, 0x80000089);
+      const chainIdentifier = 5;
+      const contractAddress = 0x2483e332d97c9daea4508c1c4f5bee4a90469229;
+      const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
+      const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+      if (!tokenData) { 
+        return ""; } else {
+        return tokenReqJson.image ? tokenReqJson.image : "";
+      }
+    
     default:
       const tokenDataValue = tokenData[recordKey];
       return tokenDataValue ? tokenDataValue : "";
@@ -128,7 +165,7 @@ app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (r
     console.log("TBA: " + tbaAccount);
 
     try {
-      db.addElement(config.baseName, name, tbaAccount, chainInt);
+      db.addElement(config.baseName, name, tbaAccount, chainInt, tokenId);
       return reply.status(200).send("pass");
     } catch (e) {
       return reply.status(400).send(e.message);
@@ -197,11 +234,29 @@ function addHexPrefix(hex: string): string {
   console.log(`Recovered address: ${signerAddress}`);
 }*/
 
+async function calcAddress() {
+
+  const chainIdentifier: number = 5;
+  const contractAddress = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
+      const TBAAddr = "0xcA1167915584462449EE5b4Ea51c37fE81eCDCCD";
+
+  const tbaAccount = await getTokenBoundAccount(chainIdentifier, contractAddress, 1);
+  console.log("TBA: " + tbaAccount);
+  
+      //const tokenId = 1;
+      const { tokenContract, tokenId, chainId } = await getTokenBoundNFT(chainIdentifier, tbaAccount);
+      //const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+
+      console.log(`tokenId: ${<string>tokenId} chainId ${<string>chainId} tokenContract ${tokenContract}`);
+}
+
 const start = async () => {
 
   try {
     await app.listen({ port: 8083, host: '0.0.0.0' });
     console.log(`Server is listening on ${app.server?.address().port}`);
+    db.initDb();
+    calcAddress();
   } catch (err) {
     console.log(err);
     app.log.error(err);
