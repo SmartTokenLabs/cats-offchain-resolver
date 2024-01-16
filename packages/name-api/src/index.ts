@@ -86,11 +86,11 @@ app.get('/text/:name/:key', async (request, reply) => {
 
 
       }
-      const { addr } = db.addr(recordName, 0x80000089);
+      /*const { addr } = db.addr(recordName, 0x80000089);
       const chainIdentifier = 5;
       const contractAddress = 0x2483e332d97c9daea4508c1c4f5bee4a90469229;
       const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
-      const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+      const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);*/
       if (!tokenData) { 
         return ""; } else {
         return tokenReqJson.image ? tokenReqJson.image : "";
