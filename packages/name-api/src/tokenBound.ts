@@ -1,5 +1,5 @@
 import { TokenboundClient } from "@tokenbound/sdk";
-import { polygon, polygonMumbai } from "viem/chains";
+import { polygon, polygonMumbai, goerli } from "viem/chains";
 
 export function getTokenBoundAccount(chainId: number, tokenContract: `0x${string}`, tokenId: `0x${string}`) {
 
@@ -12,6 +12,9 @@ export function getTokenBoundAccount(chainId: number, tokenContract: `0x${string
 			break;
 		case 137:
 			chain = polygon;
+			break;
+		case 5:
+			chain = goerli;
 			break;
 	}
 
@@ -35,6 +38,10 @@ export function getTokenBoundNFT(chainIdentifier: number, accountAddress: any) {
 		case 137:
 			chain = polygon;
 			break;
+		case 5:
+			chain = goerli;
+			break;
+
 	}
 
 	const tbaClient = new TokenboundClient({
