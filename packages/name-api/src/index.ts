@@ -67,7 +67,6 @@ app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
   if (!recordKey || !recordName) return "";
-  
   switch (recordKey.toLowerCase()) {
     case 'avatar':
       const { tokenId } = db.getTokenIdFromName(recordName);
@@ -75,6 +74,15 @@ app.get('/text/:name/:key', async (request, reply) => {
         return "";
       } else {
         return getTokenImage(recordName, tokenId);
+
+
+  /*const { addr } = db.addr(recordName, 0x80000089);
+  const chainIdentifier = 5;
+  // const chainIdentifier = 137;
+  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
+  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId)
+  if (!tokenData) return "";*/
+
 
       }
       const { addr } = db.addr(recordName, 0x80000089);
