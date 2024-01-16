@@ -24,15 +24,11 @@ export function getTokenBoundAccount(chainId: number, tokenContract: `0x${string
 }
 
 
-interface Accountaddr {
-	accountAddress: `0x${string}`;
-}
-
-export function getTokenBoundNFT(chainId: number, accountAddress: Accountaddr) {
+export function getTokenBoundNFT(chainIdentifier: number, accountAddress: any) {
 
 	let chain = undefined;
 
-	switch (chainId) {
+	switch (chainIdentifier) {
 		case 80001:
 			chain = polygonMumbai;
 			break;
@@ -42,9 +38,9 @@ export function getTokenBoundNFT(chainId: number, accountAddress: Accountaddr) {
 	}
 
 	const tbaClient = new TokenboundClient({
-		chainId,
+		chainId: chainIdentifier,
 		chain
 	});
 
-	return tbaClient.getNFT(accountAddress);
+	return tbaClient.getNFT({ accountAddress });
 }

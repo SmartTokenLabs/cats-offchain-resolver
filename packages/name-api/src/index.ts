@@ -40,14 +40,29 @@ await app.register(cors, {
 app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
+  if (!recordKey || !recordName) return;
 
-  if (recordKey.toLowerCase() !== 'avatar') return;
+  const chainIdentifier = 137;
+  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, recordName);
 
-  const chainId = 137;
-  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainId, recordName);
-  const tokenReq = await fetch(`https://resources.smarttokenlabs.com/${chainId}/${tokenContract}/${tokenId}`);
-  const tokenReqJson = await tokenImageReq.toJson();
-  return tokenReqJson.image;
+  let tokenData;
+
+  try {
+    const tokenReq = await fetch(`https://resources.smarttokenlabs.com/${chainId}/${tokenContract}/${tokenId}`);
+    tokenData = await tokenImageReq.toJson();
+  } catch {
+    return "";
+  }
+
+  if (!tokenData) return "";
+
+  switch (recordKey.toLowerCase()) {
+    case 'avatar':
+      return tokenReqJson.image ? tokenReqJson.image : "";
+    default:
+      const tokenDataValue = tokenData[recordKey];
+      return tokenDataValue ? tokenDataValue : "";
+  }
 });
 
 app.get('/checkname/:name', async (request, reply) => {
