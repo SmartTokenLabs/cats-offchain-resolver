@@ -62,10 +62,15 @@ const queryHandlers: {
   },
   // @ts-ignore
   'text(bytes32,string)': async (dataPath, name, ttlVal, args) => {
-    //const { value, ttl } = await db.text(name, args[0]);
-    console.log(`name: ${name} arg: ${args[0]}`);
-    const value = "https://resources.smartlayer.network/smartcat/reources/images/6239e1251a63c6371ebbf214e13b7ded.png";
-    return { result: [value], ttl:ttlVal };
+    try {
+      console.log(`name: ${name} arg: ${args[0]}`);
+      const addrReq = await fetch(`${dataPath}/text/${name}/${args[0]}`);
+      const resp = await addrReq.json();
+      return { result: [resp], ttl:ttlVal };
+    } catch (error) {
+      console.log('error', error);
+      return { result: [""], ttl:ttlVal };
+    }
   },
   // @ts-ignore
   'contenthash(bytes32)': async (dataPath, name, ttlVal, _args) => {
