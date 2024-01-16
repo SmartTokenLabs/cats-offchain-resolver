@@ -43,7 +43,8 @@ app.get('/text/:name/:key', async (request, reply) => {
   const recordKey = request.params.key; // e.g. Avatar
   if (!recordKey || !recordName) return "";
   const { addr } = db.addr(recordName, 0x80000089);
-  const chainIdentifier = 137;
+  const chainIdentifier = 5;
+  // const chainIdentifier = 137;
   const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
   const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId)
   if (!tokenData) return "";
