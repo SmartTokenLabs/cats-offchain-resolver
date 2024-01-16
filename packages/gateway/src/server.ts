@@ -63,7 +63,8 @@ const queryHandlers: {
   // @ts-ignore
   'text(bytes32,string)': async (dataPath, name, ttlVal, args) => {
     //const { value, ttl } = await db.text(name, args[0]);
-    const value = null;
+    console.log(`name: ${name} arg: ${args[0]}`);
+    const value = "https://resources.smartlayer.network/smartcat/reources/images/6239e1251a63c6371ebbf214e13b7ded.png";
     return { result: [value], ttl:ttlVal };
   },
   // @ts-ignore
