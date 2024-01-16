@@ -60,7 +60,8 @@ async function getTokenImage(name: string, tokenId: number) {
   //TODO: lookup token contract and chainId from database, given the name.
   //      You would store the avatar URL at creation time
 
-  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+  //const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+  return "";
 }
 
 app.get('/text/:name/:key', async (request, reply) => {
