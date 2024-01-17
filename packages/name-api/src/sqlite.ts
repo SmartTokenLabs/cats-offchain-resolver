@@ -52,9 +52,9 @@ export class SQLiteDatabase {
     var useCoinType = coinType;
 
     // Grim hack: for our first experiments only coinType 60 worked due to only 0, 2, 3, 60, 61, 700 being supported by @ethersproject base-provider
-    // In this experiment, we only return addresses intended for Polygon/ ENSIP-11, since all the addresses are stored as 60,
+    // In this experiment, we only return addresses intended for Polygon/ENSIP-11 & SLIP-44, since all the addresses are stored as 60,
     // convert input ENSIP-11(MATIC) to 60, and input 60 to an unused value
-    if (coinType == 0x80000089) {
+    if (coinType == 0x80000089 || coinType == 966) {
       useCoinType = 60;
     } else if (coinType == 60) {
       useCoinType = -1; 
@@ -82,6 +82,23 @@ export class SQLiteDatabase {
       .on('end', () => {
         return "complete";
       });
+  }
+
+  // @ts-ignore
+  updateTokenId(name: string, tokenId: number) {
+    const row = this.db.prepare('SELECT token_id FROM names WHERE name = ?').get(name.toLowerCase());
+    if (!row) {
+      console.log("Not there");
+    } else {
+      console.log("There");
+    }
+    /*if (row) {
+      // @ts-ignore
+      this.db.prepare('UPDATE names SET tokenId = ? WHERE addresses LIKE ?').run(tokenId, `%"${address}"%`);
+      return row.name;
+    } else {
+      return null;
+    }*/
   }
 
   getTokenIdFromName(name: string): number {
@@ -139,6 +156,7 @@ export class SQLiteDatabase {
     return !row;
   }
 
+  // @ts-ignore
   addElement(baseName: string, name: string, address: string, chainId: number, tokenId: number) {
     const santisedName = name.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
     const truncatedText = santisedName.slice(0, 42); // limit name to 255
@@ -153,7 +171,10 @@ export class SQLiteDatabase {
     const addresses = { 60: address };
     const contenthash = '0xe301017012204edd2984eeaf3ddf50bac238ec95c5713fb40b5e428b508fdbe55d3b9f155ffe';
 
-    const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id, token_id) VALUES (?, ?, ?, ?, ?)');
-    stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId, tokenId);
+    //const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id, token_id) VALUES (?, ?, ?, ?, ?)');
+    //stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId, tokenId);
+    const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id) VALUES (?, ?, ?, ?)');
+    stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId);
+    
   }
 }

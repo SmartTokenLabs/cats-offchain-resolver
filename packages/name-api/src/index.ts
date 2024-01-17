@@ -59,10 +59,20 @@ await app.register(cors, {
 async function getTokenImage(name: string, tokenId: number) {
   //TODO: lookup token contract and chainId from database, given the name.
   //      You would store the avatar URL at creation time
-  //get domain
-  
-  var tokenContract;
-  var chainId;
+
+  let { chainId, tokenContract } = getTokenLocation(name);
+
+  if (tokenContract) {
+    const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+    return tokenData;
+  } else {
+    return "";
+  }
+}
+
+function getTokenLocation(name: string): {number, string} {
+  var tokenContract: string;
+  var chainId: number;
   const baseName = getBaseName(name);
   console.log("Base name: " + baseName);
 
@@ -77,12 +87,7 @@ async function getTokenImage(name: string, tokenId: number) {
       break;
   }
 
-  if (tokenContract) {
-    const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
-    return tokenData;
-  } else {
-    return "";
-  }
+  return {chainId, tokenContract};
 }
 
 app.get('/text/:name/:key', async (request, reply) => {
@@ -124,9 +129,22 @@ app.get('/image/:name', async (request, reply) => {
 });
 
 // input: tokenbound address
-app.get('/name/:address', async (request, reply) => {
+app.get('/name/:address/:tokenid?', async (request, reply) => {
   const address = request.params.address;
-  return db.getNameFromAddress(address)
+  const tokenId = request.params.tokenid;
+  console.log("Addr2: " + address + " tokenid " + tokenId);
+  const fetchedName = db.getNameFromAddress(address);
+  if (fetchedName && tokenId) {
+    // check if TBA matches calc:
+    let { chainId, tokenContract } = getTokenLocation(name);
+    if (tokenContract) {
+      const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
+      console.log(`fromUser: ${address} calc:${tbaAccount}`);
+      if (tbaAccount == address) {
+        db.updateTokenId(name, tokenId);
+      }
+    }
+  }
 });
 
 app.get('/count/:val', async (request, reply) => {
@@ -234,47 +252,9 @@ function addHexPrefix(hex: string): string {
   }
 }
 
-/*async function genSig() {
-  // The message you want to sign
-
-  const message = 'gonzo2,134';
-
-  const wallet = new ethers.Wallet(PRIVATE_KEY);
-
-  //let signature = await signer.sign( "YOLESS" );
-
-  
-
-  // Sign the message
-  const signature = await wallet.signMessage(message);
-
-  console.log(signature);
-
-  const signerAddress = ethers.verifyMessage(message, signature);
-
-  console.log(`Recovered address: ${signerAddress}`);
-}*/
-
 function getBaseName(name: string): string {
   let parts = name.split('.');
   return parts.slice(1).join('.');
-}
-
-function getTBAName() {
-  var tbaAccount = getTokenBoundAccount(5, "0x2483e332d97C9DaeA4508c1C4F5BEE4a90469229", 1);
-  console.log("TBA: " + tbaAccount);
-  tbaAccount = getTokenBoundAccount(137, "0x2483e332d97C9DaeA4508c1C4F5BEE4a90469229", 1);
-  console.log("TBA: " + tbaAccount);
-  tbaAccount = getTokenBoundAccount(80001, "0x2483e332d97C9DaeA4508c1C4F5BEE4a90469229", 1);
-  console.log("TBA: " + tbaAccount);
-  tbaAccount = getTokenBoundAccount(5, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
-  console.log("TBA: " + tbaAccount);
-  tbaAccount = getTokenBoundAccount(137, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
-  console.log("TBA: " + tbaAccount);
-  tbaAccount = getTokenBoundAccount(80001, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
-  console.log("TBA: " + tbaAccount);
-  tbaAccount = getTokenBoundAccount(5, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
-  console.log("TBA: " + tbaAccount);
 }
 
 const start = async () => {
@@ -283,7 +263,6 @@ const start = async () => {
     await app.listen({ port: 8083, host: '0.0.0.0' });
     console.log(`Server is listening on ${app.server?.address().port}`);
     db.initDb();
-    getTBAName();
   } catch (err) {
     console.log(err);
     app.log.error(err);
