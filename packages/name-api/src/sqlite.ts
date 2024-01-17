@@ -92,17 +92,8 @@ export class SQLiteDatabase {
     console.log("TokenId: " + row.token_id);
     // @ts-ignore
     if (!row || !row.token_id) {
-      console.log("Not there");
-    } else {
-      console.log("There");
+      this.db.prepare('UPDATE names SET tokenId = ? WHERE name = ?').run(tokenId, name.toLowerCase());
     }
-    /*if (row) {
-      // @ts-ignore
-      this.db.prepare('UPDATE names SET tokenId = ? WHERE addresses LIKE ?').run(tokenId, `%"${address}"%`);
-      return row.name;
-    } else {
-      return null;
-    }*/
   }
 
   getTokenIdFromName(name: string): number {
