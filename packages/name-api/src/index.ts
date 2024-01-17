@@ -175,7 +175,7 @@ app.get('/count', async (request, reply) => {
   return sz;
 });
 
-app.get('lastError', async (request, reply) => {
+app.get('/lastError', async (request, reply) => {
   var errors = "";
   try {
     let errorPage = lastError.length < 100 ? lastError.length : 100; 
