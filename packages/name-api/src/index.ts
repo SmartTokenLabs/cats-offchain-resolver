@@ -112,6 +112,11 @@ app.get('/checkname/:name', async (request, reply) => {
   }
 });
 
+app.get('/tokenId/:name', async (request, reply) => {
+  const name = request.params.name;
+  return db.getTokenIdFromName(name);
+});
+
 // input: tokenbound address
 app.get('/name/:address', async (request, reply) => {
   const address = request.params.address;
