@@ -60,11 +60,11 @@ async function getTokenImage(name: string, tokenId: number) {
   //TODO: lookup token contract and chainId from database, given the name.
   //      You would store the avatar URL at creation time
   //get domain
-  let parsed = ethers.utils.namehash(name);
-  let strippedName = ethers.utils.parseName(parsed);
-  console.log("Domain: " + strippedName);
+  
   var tokenContract = "";
   var chainId;
+  const baseName = getBaseName(name);
+  console.log("Base name: " + baseName);
 
   switch (name) {
     case 'smartcat.eth':
@@ -86,15 +86,16 @@ async function getTokenImage(name: string, tokenId: number) {
 app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
+  console.log("text: " + recordName + " : " + recordKey);
   if (!recordKey || !recordName) return "";
   switch (recordKey.toLowerCase()) {
     case 'avatar':
-      const { tokenId } = db.getTokenIdFromName(recordName);
+      const tokenId: number = db.getTokenIdFromName(recordName);
       console.log("TokenID: " + tokenId);
       if (tokenId == -1) {
         return "";
       } else {
-        return await getTokenImage(recordName, tokenId);
+        return getTokenImage(recordName, tokenId);
       }
 
     default:
@@ -115,6 +116,12 @@ app.get('/checkname/:name', async (request, reply) => {
 app.get('/tokenId/:name', async (request, reply) => {
   const name = request.params.name;
   return db.getTokenIdFromName(name);
+});
+
+app.get('/image/:name', async (request, reply) => {
+  const name = request.params.name;
+  const tokenId = db.getTokenIdFromName(name);
+  return getTokenImage(name, tokenId);
 });
 
 // input: tokenbound address
