@@ -89,12 +89,10 @@ async function getTokenImage(name: string, tokenId: number) {
 app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
-  console.log("text: " + recordName + " : " + recordKey);
   if (!recordKey || !recordName) return "";
   switch (recordKey.toLowerCase()) {
     case 'avatar':
       const tokenId: number = db.getTokenIdFromName(recordName);
-      console.log("TokenID: " + tokenId);
       if (tokenId == -1) {
         return "";
       } else {

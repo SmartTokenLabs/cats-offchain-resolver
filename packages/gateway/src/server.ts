@@ -61,10 +61,9 @@ const queryHandlers: {
   // @ts-ignore
   'text(bytes32,string)': async (dataPath, name, ttlVal, args) => {
     try {
-      console.log(`name: ${name} arg: ${args[0]}`);
+      console.log(`text request: ${name} arg: ${args[0]}`);
       const addrReq = await fetch(`${dataPath}/text/${name}/${args[0]}`);
       const text = await addrReq.text();
-      console.log("Ava: " + text);
       return { result: [text], ttl:ttlVal };
     } catch (error) {
       console.log('error', error);
