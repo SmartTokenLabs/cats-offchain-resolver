@@ -36,6 +36,16 @@ const db: SQLiteDatabase = new SQLiteDatabase(
 console.log(`Path to Cert: ${PATH_TO_CERT}`);
 
 var app;
+var lastError: string[];
+
+interface QueryResult {
+  owns: boolean;
+  timeStamp: number;
+}
+
+let cachedResults = new Map<string, QueryResult>();
+
+const cacheTimeout = 30 * 1000; // 30 second cache validity
 
 if (PATH_TO_CERT) {
   app = fastify({
@@ -57,9 +67,6 @@ await app.register(cors, {
 })
 
 async function getTokenImage(name: string, tokenId: number) {
-  //TODO: lookup token contract and chainId from database, given the name.
-  //      You would store the avatar URL at creation time
-
   let { chainId, tokenContract } = getTokenLocation(name);
 
   if (tokenContract) {
@@ -70,7 +77,8 @@ async function getTokenImage(name: string, tokenId: number) {
   }
 }
 
-function getTokenLocation(name: string): {number, string} {
+// TODO: This should be sourced from a database sub-table
+function getTokenLocation(name: string): { number, string } {
   var tokenContract: string;
   var chainId: number;
   const baseName = getBaseName(name);
@@ -87,7 +95,7 @@ function getTokenLocation(name: string): {number, string} {
       break;
   }
 
-  return {chainId, tokenContract};
+  return { chainId, tokenContract };
 }
 
 app.get('/text/:name/:key', async (request, reply) => {
@@ -149,18 +157,6 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
   return fetchedName;
 });
 
-app.get('/count/:val', async (request, reply) => {
-  var sz = 0;
-  try {
-    sz = db.getAccountCount();
-  } catch (error) {
-    console.log(error);
-    sz = error;
-  }
-
-  return sz;
-});
-
 app.get('/addr/:name/:coinType', async (request, reply) => {
   const name = request.params.name;
   const coinType = request.params.coinType;
@@ -179,6 +175,30 @@ app.get('/count', async (request, reply) => {
   return sz;
 });
 
+app.get('lastError', async (request, reply) => {
+  var errors = "";
+  try {
+    let errorPage = lastError.length < 100 ? lastError.length : 100; 
+    for (let i = 0; i < errorPage; i++) {
+      errors += lastError[i];
+      errors += ',';
+    }
+
+    // Consume errors
+    if (errorPage == 100) {
+      lastError.splice(0, 100);
+    } else {
+      lastError = [];
+    }
+
+  } catch (error) {
+    console.log(error);
+    sz = error;
+  }
+
+  return errors;
+});
+
 app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (request, reply) => {
 
   const { chainId, tokenContract, tokenId, name, signature } = request.params;
@@ -191,28 +211,29 @@ app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (r
   if (!db.checkAvailable(name))
     return reply.status(403).send("Name Unavailable");
 
-  const applyerAddress = recoverAddress(name, tokenId, signature);
-  console.log("APPLY: " + applyerAddress);
+  try {
+    const applyerAddress = recoverAddress(name, tokenId, signature);
+    console.log("APPLY: " + applyerAddress);
 
-  //now determine if user owns the NFT
-  const userOwns = await userOwnsNFT(chainId, tokenContract, applyerAddress, tokenId);
+    //now determine if user owns the NFT
+    const userOwns = await userOwnsNFT(chainId, tokenContract, applyerAddress, tokenId);
 
-  if (userOwns) {
+    if (userOwns) {
+      const chainInt = parseInt(chainId);
+      const tbaAccount = getTokenBoundAccount(chainInt, tokenContract, tokenId);
+      console.log("TBA: " + tbaAccount);
 
-    const chainInt = parseInt(chainId);
-
-    const tbaAccount = getTokenBoundAccount(chainInt, tokenContract, tokenId);
-
-    console.log("TBA: " + tbaAccount);
-
-    try {
       db.addElement(config.baseName, name, tbaAccount, chainInt, tokenId);
       return reply.status(200).send("pass");
-    } catch (e) {
-      return reply.status(400).send(e.message);
+    } else {
+      return reply.status(403).send("User does not own the NFT or signature is invalid");
     }
-  } else {
-    return reply.status(403).send("User does not own the NFT or signature is invalid");
+  } catch (e) {
+    if (lastError.length < 1000) { // don't overflow errors
+      lastError.push(e.message);
+    }
+    
+    return reply.status(400).send(e.message);
   }
 });
 
@@ -229,6 +250,12 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
   if (!chainId)
     throw new Error("Missing chain config");
 
+  // Spamming protection  
+  if (checkCachedResults(chainId, contractAddress, applyerAddress, tokenId)) {
+    console.log("Checking cache");
+    return useCachedValue(chainId, contractAddress, applyerAddress, tokenId);
+  }
+
   const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
 
   const testCatsContract = new ethers.Contract(contractAddress, [
@@ -239,9 +266,44 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
   console.log("Owner: " + owner);
   if (owner === applyerAddress) {
     console.log("Owns");
+    cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: true, timeStamp: Date.now()});
     return true;
   } else {
     console.log("Doesn't own");
+    cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: false, timeStamp: Date.now()});
+    return false;
+  }
+}
+
+function getCacheKey(chainId, contractAddress, applyerAddress, tokenId): string {
+  return contractAddress + "-" + chainId + "-" + applyerAddress + "-" + tokenId;
+}
+
+function useCachedValue(chainId, contractAddress, applyerAddress, tokenId): boolean {
+  const key = getCacheKey(chainId, contractAddress, applyerAddress, tokenId);
+  const mapping = cachedResults.get(key);
+  if (mapping) {
+    console.log("Owns?: " + mapping.owns);
+    return mapping.owns;
+  } else {
+    lastError.push("Bad Mapping: " + applyerAddress);
+    return false;
+  }
+}
+
+function checkCachedResults(chainId, contractAddress, applyerAddress, tokenId): boolean {
+  const key = getCacheKey(chainId, contractAddress, applyerAddress, tokenId);
+  const mapping = cachedResults.get(key);
+  if (mapping) {
+    if (mapping.timeStamp < (Date.now() - 30 * 1000)) {
+      //out of date result, remove key
+      cachedResults.delete(key);
+      return false;
+    } else {
+      console.log("Can use cache");
+      return true;
+    }
+  } else {
     return false;
   }
 }
@@ -259,12 +321,25 @@ function getBaseName(name: string): string {
   return parts.slice(1).join('.');
 }
 
+function checkCacheEntries() {
+  //check cache and clear old values
+  console.log("Checking cache entries");
+  for (let [key, result] of cachedResults) {
+    console.log(`Key: ${key}, Owns: ${result.owns}, Timestamp: ${result.timeStamp}`);
+    if (result.timeStamp < (Date.now() - cacheTimeout)) {
+      console.log("out of date entry: " + key);
+      cachedResults.delete(key);
+    }
+  }
+}
+
 const start = async () => {
 
   try {
     await app.listen({ port: 8083, host: '0.0.0.0' });
     console.log(`Server is listening on ${app.server?.address().port}`);
     db.initDb();
+    setInterval(checkCacheEntries, cacheTimeout * 2);
   } catch (err) {
     console.log(err);
     app.log.error(err);

@@ -4,22 +4,22 @@ dotenv.config();
 
 export const SQLite_DB_FILE = process.env.SQLite_DB_FILE;
 export const PATH_TO_CERT = process.env.CERT_PATH;
+export const INFURA_KEY = process.env.INFURA_KEY;
 
 if (!SQLite_DB_FILE) throw new Error("No Sqlite file provided");
 
 // RPC URL is not actually needed for calculating TBA addresses but may be needed for other function in the future
 export const CHAIN_CONFIG = {
 	137: {
-		rpcUrl: "https://polygon-mainnet.infura.io/v3/3ca8f1ba91f84e1f97c99f6218fe3743"
+		rpcUrl: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`
 	},
 	80001: {
-		rpcUrl: "https://polygon-mumbai.g.alchemy.com/v2/rVI6pOV4irVsrw20cJxc1fxK_1cSeiY0"
+		rpcUrl: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`
 	},
 	5: {
-		rpcUrl: "https://ethereum-goerli.publicnode.com"
+		rpcUrl: `https://goerli.infura.io/v3/${INFURA_KEY}`
 	}
 }
-
 
 export const CONTRACT_CONFIG = {
 	// Smartcat production

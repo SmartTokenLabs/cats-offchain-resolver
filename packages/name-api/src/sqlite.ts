@@ -67,32 +67,11 @@ export class SQLiteDatabase {
     return { addr: addresses[useCoinType] };
   }
 
-  // @ts-ignore
-  setTokenId(domainName: string, chainId: number, tokensCSV: string) {
-
-    Readable.from(tokensCSV)
-      .pipe(csv())
-      .on('data', (row: string) => {
-        //handle each data element:
-        //1. calculate TBA using domain name and chainId
-        //2. find corresponding entry in DB
-        //3. update DB element if found
-        console.log(row);
-      })
-      .on('end', () => {
-        return "complete";
-      });
-  }
-
-  // @ts-ignore
   updateTokenId(name: string, tokenId: number) {
     const row = this.db.prepare('SELECT token_id FROM names WHERE name = ?').get(name.toLowerCase());
     
     // @ts-ignore
-    console.log("TokenId: " + row.token_id);
-    // @ts-ignore
     if (!row || !row.token_id) {
-      console.log("Update");
       try {
         this.db.prepare('UPDATE names SET token_id = ? WHERE name = ?').run(tokenId, name.toLowerCase());
       } catch (error) {
@@ -171,10 +150,7 @@ export class SQLiteDatabase {
     const addresses = { 60: address };
     const contenthash = '0xe301017012204edd2984eeaf3ddf50bac238ec95c5713fb40b5e428b508fdbe55d3b9f155ffe';
 
-    //const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id, token_id) VALUES (?, ?, ?, ?, ?)');
-    //stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId, tokenId);
-    const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id) VALUES (?, ?, ?, ?)');
-    stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId);
-    
+    const stmt = this.db.prepare('INSERT INTO names (name, addresses, contenthash, chain_id, token_id) VALUES (?, ?, ?, ?, ?)');
+    stmt.run(fullName, JSON.stringify(addresses), contenthash, chainId, tokenId);
   }
 }
