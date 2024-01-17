@@ -7,7 +7,12 @@ export const tokenDataRequest = async (chainId: number, tokenContract: string, t
     }
 
     const tokenReq = await fetch(queryUrl);
-    const tokenJSON = tokenReq.json();
+    const tokenJSON = await tokenReq.json();
+    console.log("JSON: " + tokenJSON);
+    console.log("TJ " + tokenJSON.image);
+
+    //const jsonObj = tokenJSON ? JSON.parse(tokenJSON) : null;
+
     // @ts-ignore
     return tokenJSON.image;
   } catch (error) {
