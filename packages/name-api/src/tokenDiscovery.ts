@@ -7,7 +7,9 @@ export const tokenDataRequest = async (chainId: number, tokenContract: string, t
     }
 
     const tokenReq = await fetch(queryUrl);
-    return tokenReq.json();
+    const tokenJSON = tokenReq.json();
+    // @ts-ignore
+    return tokenJSON.image;
   } catch (error) {
     console.log("error: ", error);
     return null;

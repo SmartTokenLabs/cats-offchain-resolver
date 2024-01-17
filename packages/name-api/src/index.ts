@@ -61,7 +61,7 @@ async function getTokenImage(name: string, tokenId: number) {
   //      You would store the avatar URL at creation time
   //get domain
   
-  var tokenContract = "";
+  var tokenContract;
   var chainId;
   const baseName = getBaseName(name);
   console.log("Base name: " + baseName);
@@ -77,10 +77,13 @@ async function getTokenImage(name: string, tokenId: number) {
       break;
   }
 
-  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
-  console.log("TokenImage: " + tokenData);
-
-  return tokenData;
+  if (tokenContract) {
+    const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+    console.log("TokenImage: " + tokenData);
+    return tokenData;
+  } else {
+    return "";
+  }
 }
 
 app.get('/text/:name/:key', async (request, reply) => {
