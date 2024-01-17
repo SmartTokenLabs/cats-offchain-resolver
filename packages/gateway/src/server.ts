@@ -63,8 +63,9 @@ const queryHandlers: {
     try {
       console.log(`name: ${name} arg: ${args[0]}`);
       const addrReq = await fetch(`${dataPath}/text/${name}/${args[0]}`);
-      console.log("Ava: " + addrReq);
-      return { result: [addrReq], ttl:ttlVal };
+      const text = await addrReq.text();
+      console.log("Ava: " + text);
+      return { result: [text], ttl:ttlVal };
     } catch (error) {
       console.log('error', error);
       return { result: [""], ttl:ttlVal };
