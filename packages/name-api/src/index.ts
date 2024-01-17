@@ -63,24 +63,24 @@ async function getTokenImage(name: string, tokenId: number) {
   let parsed = ethers.utils.namehash(name);
   let strippedName = ethers.utils.parseName(parsed);
   console.log("Domain: " + strippedName);
-  var contractAddr;
+  var tokenContract = "";
   var chainId;
 
   switch (name) {
     case 'smartcat.eth':
-      contractAddr = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
+      tokenContract = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
       chainId = 5;
       break;
     case 'thesmartcats.eth':
-      contractAddr = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
-      chainId = 5;
+      tokenContract = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
+      chainId = 137;
       break;
   }
 
-
   const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
+  console.log("TokenImage: " + tokenData);
 
-  return "";
+  return tokenData;
 }
 
 app.get('/text/:name/:key', async (request, reply) => {
@@ -90,31 +90,13 @@ app.get('/text/:name/:key', async (request, reply) => {
   switch (recordKey.toLowerCase()) {
     case 'avatar':
       const { tokenId } = db.getTokenIdFromName(recordName);
+      console.log("TokenID: " + tokenId);
       if (tokenId == -1) {
         return "";
       } else {
-        return getTokenImage(recordName, tokenId);
-
-
-  /*const { addr } = db.addr(recordName, 0x80000089);
-  const chainIdentifier = 5;
-  // const chainIdentifier = 137;
-  const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
-  const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId)
-  if (!tokenData) return "";*/
-
-
+        return await getTokenImage(recordName, tokenId);
       }
-      /*const { addr } = db.addr(recordName, 0x80000089);
-      const chainIdentifier = 5;
-      const contractAddress = 0x2483e332d97c9daea4508c1c4f5bee4a90469229;
-      const { tokenContract, tokenId, chainId } = getTokenBoundNFT(chainIdentifier, address);
-      const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);*/
-      if (!tokenData) { 
-        return ""; } else {
-        return tokenReqJson.image ? tokenReqJson.image : "";
-      }
-    
+
     default:
       const tokenDataValue = tokenData[recordKey];
       return tokenDataValue ? tokenDataValue : "";

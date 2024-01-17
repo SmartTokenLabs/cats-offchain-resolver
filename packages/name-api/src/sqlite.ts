@@ -145,8 +145,6 @@ export class SQLiteDatabase {
 
     let fullName = truncatedText + '.' + baseName;
 
-    console.log("Fullname " + fullName);
-
     const existingRow = this.db.prepare('SELECT * FROM names WHERE name = ? OR addresses LIKE ?').get(fullName, `%"${address}"%`);
 
     if (existingRow)
