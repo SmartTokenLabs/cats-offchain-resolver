@@ -92,7 +92,12 @@ export class SQLiteDatabase {
     console.log("TokenId: " + row.token_id);
     // @ts-ignore
     if (!row || !row.token_id) {
-      this.db.prepare('UPDATE names SET tokenId = ? WHERE name = ?').run(tokenId, name.toLowerCase());
+      console.log("Update");
+      try {
+        this.db.prepare('UPDATE names SET tokenId = ? WHERE name = ?').run(tokenId, name.toLowerCase());
+      } catch (error) {
+        console.log(error);
+      }
     }
   }
 
