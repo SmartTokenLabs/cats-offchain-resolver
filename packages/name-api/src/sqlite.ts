@@ -94,7 +94,7 @@ export class SQLiteDatabase {
     if (!row || !row.token_id) {
       console.log("Update");
       try {
-        this.db.prepare('UPDATE names SET tokenId = ? WHERE name = ?').run(tokenId, name.toLowerCase());
+        this.db.prepare('UPDATE names SET token_id = ? WHERE name = ?').run(tokenId, name.toLowerCase());
       } catch (error) {
         console.log(error);
       }
