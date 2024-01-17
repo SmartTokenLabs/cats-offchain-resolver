@@ -262,31 +262,26 @@ function addHexPrefix(hex: string): string {
   console.log(`Recovered address: ${signerAddress}`);
 }*/
 
-async function calcAddress() {
-
-  const name = "bert.thesmartcats.eth";
-  let normalized = ethers.ensNormalize(name);
-  //let parsed = ethers.namehash(name);
-  let p1 = ethers.dnsEncode(name);
-
+function getBaseName(name: string): string {
   let parts = name.split('.');
-  let domain = parts.slice(1).join('.');
+  return parts.slice(1).join('.');
+}
 
-  // let strippedName = ethers.parseName(parsed);
-  console.log("NAME: " + p1 + " : " + domain);
-
-  const chainIdentifier: number = 5;
-  const contractAddress = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
-      const TBAAddr = "0xcA1167915584462449EE5b4Ea51c37fE81eCDCCD";
-
-  const tbaAccount = await getTokenBoundAccount(chainIdentifier, contractAddress, 1);
+function getTBAName() {
+  var tbaAccount = getTokenBoundAccount(5, "0x2483e332d97C9DaeA4508c1C4F5BEE4a90469229", 1);
   console.log("TBA: " + tbaAccount);
-  
-      //const tokenId = 1;
-      const { tokenContract, tokenId, chainId } = await getTokenBoundNFT(chainIdentifier, tbaAccount);
-      //const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
-
-      console.log(`tokenId: ${<string>tokenId} chainId ${<string>chainId} tokenContract ${tokenContract}`);
+  tbaAccount = getTokenBoundAccount(137, "0x2483e332d97C9DaeA4508c1C4F5BEE4a90469229", 1);
+  console.log("TBA: " + tbaAccount);
+  tbaAccount = getTokenBoundAccount(80001, "0x2483e332d97C9DaeA4508c1C4F5BEE4a90469229", 1);
+  console.log("TBA: " + tbaAccount);
+  tbaAccount = getTokenBoundAccount(5, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
+  console.log("TBA: " + tbaAccount);
+  tbaAccount = getTokenBoundAccount(137, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
+  console.log("TBA: " + tbaAccount);
+  tbaAccount = getTokenBoundAccount(80001, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
+  console.log("TBA: " + tbaAccount);
+  tbaAccount = getTokenBoundAccount(5, "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe", 1);
+  console.log("TBA: " + tbaAccount);
 }
 
 const start = async () => {
@@ -295,7 +290,7 @@ const start = async () => {
     await app.listen({ port: 8083, host: '0.0.0.0' });
     console.log(`Server is listening on ${app.server?.address().port}`);
     db.initDb();
-    calcAddress();
+    getTBAName();
   } catch (err) {
     console.log(err);
     app.log.error(err);

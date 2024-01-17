@@ -1,5 +1,7 @@
 import BetterSqlite3 from 'better-sqlite3';
 import dotenv from 'dotenv';
+import csv from 'csv-parser';
+import { Readable } from 'stream';
 dotenv.config();
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -29,12 +31,10 @@ export class SQLiteDatabase {
     const columnExists = columnInfo.some(column => column.name === 'token_id');
 
     if (!columnExists) {
-      console.log("Column !exists");
+      console.log("Updating to add tokenId");
       this.db.exec(`
       ALTER TABLE names
       ADD COLUMN token_id INTEGER;`);
-    } else {
-      console.log("Column exists");
     }
   }
 
@@ -58,21 +58,30 @@ export class SQLiteDatabase {
       useCoinType = 60;
     } else if (coinType == 60) {
       useCoinType = -1; 
-    } else if (coinType == 0) {
-      return { addr: "MQMcJhpWHYVeQArcZR3sBgyPZxxRtnH441" };
-    } else if (coinType == 2) {
-      return { addr: "12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S" };
-    } else if (coinType == 0x8000003d ) {
-      return { addr: "0x3fFB04c0065c97E165F94CC1AB3493da393C2D5F"};
-    } else if (coinType == 0x80000064 ) {
-      return { addr: "0x3fFB04c0065c97E165F94CC1AB3493da393C2D5F"};
-    }
+    } 
 
     if (!addresses || !addresses[useCoinType]) {
       return { addr: ZERO_ADDRESS };
     }
 
     return { addr: addresses[useCoinType] };
+  }
+
+  // @ts-ignore
+  setTokenId(domainName: string, chainId: number, tokensCSV: string) {
+
+    Readable.from(tokensCSV)
+      .pipe(csv())
+      .on('data', (row: string) => {
+        //handle each data element:
+        //1. calculate TBA using domain name and chainId
+        //2. find corresponding entry in DB
+        //3. update DB element if found
+        console.log(row);
+      })
+      .on('end', () => {
+        return "complete";
+      });
   }
 
   getTokenIdFromName(name: string): number {
@@ -135,6 +144,8 @@ export class SQLiteDatabase {
     const truncatedText = santisedName.slice(0, 42); // limit name to 255
 
     let fullName = truncatedText + '.' + baseName;
+
+    console.log("Fullname " + fullName);
 
     const existingRow = this.db.prepare('SELECT * FROM names WHERE name = ? OR addresses LIKE ?').get(fullName, `%"${address}"%`);
 
