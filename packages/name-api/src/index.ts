@@ -145,6 +145,8 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
       }
     }
   }
+
+  return fetchedName;
 });
 
 app.get('/count/:val', async (request, reply) => {
