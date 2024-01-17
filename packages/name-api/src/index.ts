@@ -136,12 +136,12 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
   const fetchedName = db.getNameFromAddress(address);
   if (fetchedName && tokenId) {
     // check if TBA matches calc:
-    let { chainId, tokenContract } = getTokenLocation(name);
+    let { chainId, tokenContract } = getTokenLocation(fetchedName);
     if (tokenContract) {
       const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
       console.log(`fromUser: ${address} calc:${tbaAccount}`);
       if (tbaAccount == address) {
-        db.updateTokenId(name, tokenId);
+        db.updateTokenId(fetchedName, tokenId);
       }
     }
   }
