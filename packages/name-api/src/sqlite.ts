@@ -1,7 +1,5 @@
 import BetterSqlite3 from 'better-sqlite3';
 import dotenv from 'dotenv';
-import csv from 'csv-parser';
-import { Readable } from 'stream';
 dotenv.config();
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
