@@ -87,7 +87,11 @@ export class SQLiteDatabase {
   // @ts-ignore
   updateTokenId(name: string, tokenId: number) {
     const row = this.db.prepare('SELECT token_id FROM names WHERE name = ?').get(name.toLowerCase());
-    if (!row) {
+    
+    // @ts-ignore
+    console.log("TokenId: " + row.token_id);
+    // @ts-ignore
+    if (!row || !row.token_id) {
       console.log("Not there");
     } else {
       console.log("There");
