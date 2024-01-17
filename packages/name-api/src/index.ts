@@ -66,7 +66,7 @@ async function getTokenImage(name: string, tokenId: number) {
   const baseName = getBaseName(name);
   console.log("Base name: " + baseName);
 
-  switch (name) {
+  switch (baseName) {
     case 'smartcat.eth':
       tokenContract = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
       chainId = 5;
