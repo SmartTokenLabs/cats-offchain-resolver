@@ -56,6 +56,7 @@ const queryHandlers: {
   // @ts-ignore
   'addr(bytes32,uint256)': async (dataPath, name, ttlVal, args) => {
     const coinType = <number>args[0];
+    console.log(`${name} Attempt to resolve: ${coinType}`);
     return await resolve(dataPath, name, coinType, ttlVal);
   },
   // @ts-ignore
