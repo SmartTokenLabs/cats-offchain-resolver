@@ -45,7 +45,7 @@ interface QueryResult {
 
 let cachedResults = new Map<string, QueryResult>();
 
-const cacheTimeout = 30 * 1000; // 30 second cache validity
+const cacheTimeout = 30 * 1000 * 4; // 30 second cache validity
 
 if (PATH_TO_CERT) {
   app = fastify({
@@ -177,7 +177,7 @@ app.get('/count', async (request, reply) => {
 });
 
 app.get('/lastError', async (request, reply) => {
-  var errors = "";
+  var errors = ".";
   try {
     let errorPage = lastError.length < 100 ? lastError.length : 100; 
     for (let i = 0; i < errorPage; i++) {
@@ -205,6 +205,8 @@ app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (r
   const { chainId, tokenContract, tokenId, name, signature } = request.params;
 
   const config = CONTRACT_CONFIG[chainId + "-" + tokenContract.toLowerCase()];
+
+  console.log(`/register/${chainId}/${tokenContract}/${tokenId}/${name}/${signature}`);
 
   if (!config)
     return reply.status(400).send("Invalid chain and address combination");
