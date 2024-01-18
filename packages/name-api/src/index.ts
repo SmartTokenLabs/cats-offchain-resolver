@@ -36,7 +36,7 @@ const db: SQLiteDatabase = new SQLiteDatabase(
 console.log(`Path to Cert: ${PATH_TO_CERT}`);
 
 var app;
-var lastError: string[];
+var lastError: string[] = [];
 
 interface QueryResult {
   owns: boolean;
@@ -154,6 +154,7 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
     }
   }
 
+
   return fetchedName;
 });
 
@@ -267,10 +268,12 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
   if (owner === applyerAddress) {
     console.log("Owns");
     cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: true, timeStamp: Date.now()});
+    console.log("Cached: "+ Date.now());
     return true;
   } else {
     console.log("Doesn't own");
     cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: false, timeStamp: Date.now()});
+    console.log("Cached: "+ Date.now());
     return false;
   }
 }
@@ -295,7 +298,7 @@ function checkCachedResults(chainId, contractAddress, applyerAddress, tokenId): 
   const key = getCacheKey(chainId, contractAddress, applyerAddress, tokenId);
   const mapping = cachedResults.get(key);
   if (mapping) {
-    if (mapping.timeStamp < (Date.now() - 30 * 1000)) {
+    if (mapping.timeStamp < (Date.now() - cacheTimeout)) {
       //out of date result, remove key
       cachedResults.delete(key);
       return false;
@@ -324,13 +327,22 @@ function getBaseName(name: string): string {
 function checkCacheEntries() {
   //check cache and clear old values
   console.log("Checking cache entries");
+  let removeResultKeys: string[] = [];
+
   for (let [key, result] of cachedResults) {
     console.log(`Key: ${key}, Owns: ${result.owns}, Timestamp: ${result.timeStamp}`);
     if (result.timeStamp < (Date.now() - cacheTimeout)) {
       console.log("out of date entry: " + key);
-      cachedResults.delete(key);
+      removeResultKeys.push(key);
     }
   }
+
+  removeResultKeys.forEach(value => {
+    console.log("remove out of date entry: " + value);
+    cachedResults.delete(value);
+  });
+
+
 }
 
 const start = async () => {
