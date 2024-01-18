@@ -45,7 +45,7 @@ interface QueryResult {
 
 let cachedResults = new Map<string, QueryResult>();
 
-const cacheTimeout = 30 * 1000 * 4; // 30 second cache validity
+const cacheTimeout = 30 * 1000; // 30 second cache validity
 
 if (PATH_TO_CERT) {
   app = fastify({
@@ -147,7 +147,7 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
     let { chainId, tokenContract } = getTokenLocation(fetchedName);
     if (tokenContract) {
       const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
-      console.log(`fromUser: ${address} calc:${tbaAccount}`);
+      //console.log(`fromUser: ${address} calc:${tbaAccount}`);
       if (tbaAccount == address) {
         db.updateTokenId(fetchedName, tokenId);
       }
@@ -206,8 +206,6 @@ app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (r
 
   const config = CONTRACT_CONFIG[chainId + "-" + tokenContract.toLowerCase()];
 
-  console.log(`/register/${chainId}/${tokenContract}/${tokenId}/${name}/${signature}`);
-
   if (!config)
     return reply.status(400).send("Invalid chain and address combination");
 
@@ -255,7 +253,6 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
 
   // Spamming protection  
   if (checkCachedResults(chainId, contractAddress, applyerAddress, tokenId)) {
-    console.log("Checking cache");
     return useCachedValue(chainId, contractAddress, applyerAddress, tokenId);
   }
 
@@ -270,12 +267,10 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
   if (owner === applyerAddress) {
     console.log("Owns");
     cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: true, timeStamp: Date.now()});
-    console.log("Cached: "+ Date.now());
     return true;
   } else {
     console.log("Doesn't own");
     cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: false, timeStamp: Date.now()});
-    console.log("Cached: "+ Date.now());
     return false;
   }
 }
@@ -288,7 +283,7 @@ function useCachedValue(chainId, contractAddress, applyerAddress, tokenId): bool
   const key = getCacheKey(chainId, contractAddress, applyerAddress, tokenId);
   const mapping = cachedResults.get(key);
   if (mapping) {
-    console.log("Owns?: " + mapping.owns);
+    //console.log("Owns?: " + mapping.owns);
     return mapping.owns;
   } else {
     lastError.push("Bad Mapping: " + applyerAddress);
@@ -305,7 +300,7 @@ function checkCachedResults(chainId, contractAddress, applyerAddress, tokenId): 
       cachedResults.delete(key);
       return false;
     } else {
-      console.log("Can use cache");
+      //console.log("Can use cache");
       return true;
     }
   } else {
@@ -328,19 +323,17 @@ function getBaseName(name: string): string {
 
 function checkCacheEntries() {
   //check cache and clear old values
-  console.log("Checking cache entries");
   let removeResultKeys: string[] = [];
 
   for (let [key, result] of cachedResults) {
-    console.log(`Key: ${key}, Owns: ${result.owns}, Timestamp: ${result.timeStamp}`);
     if (result.timeStamp < (Date.now() - cacheTimeout)) {
-      console.log("out of date entry: " + key);
+      //console.log("out of date entry: " + key);
       removeResultKeys.push(key);
     }
   }
 
   removeResultKeys.forEach(value => {
-    console.log("remove out of date entry: " + value);
+    //console.log("remove out of date entry: " + value);
     cachedResults.delete(value);
   });
 
