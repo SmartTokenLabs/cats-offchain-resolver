@@ -37,6 +37,7 @@ console.log(`Path to Cert: ${PATH_TO_CERT}`);
 
 var app;
 var lastError: string[] = [];
+var coinTypeRoute: string[] = [];
 
 interface QueryResult {
   owns: boolean;
@@ -101,6 +102,7 @@ function getTokenLocation(name: string): { number, string } {
 app.get('/text/:name/:key', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
+  coinTypeRoute.push(`${recordName} Text Request: ${recordKey}`);
   if (!recordKey || !recordName) return "";
   switch (recordKey.toLowerCase()) {
     case 'avatar':
@@ -161,6 +163,7 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
 app.get('/addr/:name/:coinType', async (request, reply) => {
   const name = request.params.name;
   const coinType = request.params.coinType;
+  coinTypeRoute.push(`${name} Attempt to resolve: ${coinType}`);
   return db.addr(name, coinType)
 });
 
@@ -194,10 +197,34 @@ app.get('/lastError', async (request, reply) => {
 
   } catch (error) {
     console.log(error);
-    sz = error;
+    errors = error;
   }
 
   return errors;
+});
+
+app.get('/coinTypes', async (request, reply) => {
+  var coinTypeRequests = ".";
+  try {
+    let coinPage = coinTypeRoute.length < 100 ? coinTypeRoute.length : 100; 
+    for (let i = 0; i < coinPage; i++) {
+      coinTypeRequests += coinTypeRoute[i];
+      coinTypeRequests += ',';
+    }
+
+    // Consume errors
+    if (coinPage == 100) {
+      coinTypeRoute.splice(0, 100);
+    } else {
+      coinTypeRoute = [];
+    }
+
+  } catch (error) {
+    console.log(error);
+    coinTypeRequests = error;
+  }
+
+  return coinTypeRequests;
 });
 
 app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (request, reply) => {
