@@ -1,10 +1,10 @@
 import { Command } from 'commander';
 import { GetAccountParams, TokenboundClient } from '@tokenbound/sdk';
-import { useWalletClient } from 'wagmi'
-//import { useAccount, WalletClient } from 'wagmi'
+//import {createPublicClient, http, WalletClient} from "viem";
 import ethers from 'ethers';
 //@ts-ignore
 import fetch from 'node-fetch';
+//import {goerli, mainnet} from "viem/chains";
 
 const program = new Command();
 program
@@ -94,13 +94,12 @@ const decodeAbi = [
 
 const getTokenBoundClientInstance = (chainIdp: number) => {
 
-  const result = useWalletClient({
-    chainId: chainIdp,
-  });
-
   return new TokenboundClient({
     chainId: chainId,
-    walletClient: result.walletClient,
+    /*walletClient: createPublicClient({
+      chain: chainId === 5 ? goerli : mainnet,
+      transport: http()
+    })*/
   });
 }
 
@@ -153,7 +152,7 @@ type NFTParams = {
   console.log(`UserAddress: ${ethMainnetAddress} ${userAddress}`);
 
   //now calculate EIP-6551 addr:
-   // @ts-ignore
+  //@ts-ignore
   const tknContract: `0x${string}` = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe" as `0x${string}`;
   const tknId: string = "1";
 
@@ -225,7 +224,7 @@ type NFTParams = {
     try {
       const resolverTx = await catResolver.resolve(dnsEncode, funcEncode);
       console.log(resolverTx);
-    } catch (error) {
+    } catch (error: any) {
       //break down the data
       console.log(`ERROR: ${JSON.stringify(error)}`);
       const iface = new ethers.utils.Interface(returnAbi);

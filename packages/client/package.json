@@ -11,6 +11,7 @@
     "node": ">=10"
   },
   "scripts": {
+    "script": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "build": "tsdx build",
     "lint": "tsdx lint",
@@ -49,6 +50,7 @@
     "@size-limit/preset-small-lib": "^7.0.5",
     "husky": "^7.0.4",
     "size-limit": "^7.0.5",
+    "ts-node": "^10.9.2",
     "tsdx": "^0.14.1",
     "tslib": "^2.3.1",
     "typescript": "^5.4.2"
@@ -57,7 +59,6 @@
     "@tokenbound/sdk": "^0.4.6",
     "commander": "^8.3.0",
     "ethers": "^5.7.2",
-    "viem": "^2.8.5",
-    "wagmi": "^2.5.7"
+    "viem": "^2.8.5"
   }
 }
