@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { GetAccountParams, TokenboundClient } from '@tokenbound/sdk';
 //import {createPublicClient, http, WalletClient} from "viem";
-import ethers from 'ethers';
+import {ethers} from 'ethers';
 //@ts-ignore
 import fetch from 'node-fetch';
 //import {goerli, mainnet} from "viem/chains";
@@ -142,11 +142,11 @@ type NFTParams = {
   console.log(`${name}`);
   //let resolver = await provider.getResolver(name); //TODO: This may be updated
 
-  let resolver: any = await provider.getResolver(name);
+  let resolver = await provider.getResolver(name);
 
   //console.log(`Resolver Addr: ${JSON.stringify(resolver)}`);
 
-  let ethMainnetAddress = await resolver.getAddress();
+  let ethMainnetAddress = await resolver!!.getAddress();
   
   let userAddress = await resolve(name, ensResolverAddress);
   console.log(`UserAddress: ${ethMainnetAddress} ${userAddress}`);
@@ -157,7 +157,7 @@ type NFTParams = {
   const tknId: string = "1";
 
 
-  let tokenBoundClient = getTokenBoundClientInstance(5);
+  let tokenBoundClient = getTokenBoundClientInstance(chainId);
 
   let nftParam: NFTParams = {
     tokenContract: tknContract,
@@ -189,25 +189,25 @@ type NFTParams = {
   // Port Solidity code to get TBA address
   async function computeCreate2Address(implementation: string, chainId: number, tokenContract: string, tokenId: number, salt: number, userAddr: string) {
 
-    const constructorArgs = ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "uint256", "address", "uint256"],
-        [salt, chainId, tokenContract, tokenId]
-    );
+      const constructorArgs = ethers.utils.defaultAbiCoder.encode(
+          ["uint256", "uint256", "address", "uint256"],
+          [salt, chainId, tokenContract, tokenId]
+      );
 
-    const creationCode = `0x3d60ad80600a3d3981f3363d3d373d3d3d363d73${implementation.slice(2)}5af43d82803e903d91602b57fd5bf3${constructorArgs.slice(2)}`;
+      const creationCode = `0x3d60ad80600a3d3981f3363d3d373d3d3d363d73${implementation.slice(2)}5af43d82803e903d91602b57fd5bf3${constructorArgs.slice(2)}`;
 
-    // Compute the keccak256 hash
-    const bytecodeHash = ethers.utils.keccak256(creationCode);
+      // Compute the keccak256 hash
+      const bytecodeHash = ethers.utils.keccak256(creationCode);
 
-    // Finally use Create2
-    const create2Address = ethers.utils.getCreate2Address(
-        userAddr, 
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(salt), 32),
-        bytecodeHash
-    );
+      // Finally use Create2
+      const create2Address = ethers.utils.getCreate2Address(
+          userAddr,
+          ethers.utils.hexZeroPad(ethers.utils.hexlify(salt), 32),
+          bytecodeHash
+      );
 
-    return create2Address;
-}
+      return create2Address;
+  }
 
   // @ts-ignore
   async function resolve(name: string, resolverAddress: string): Promise<string> {
@@ -268,9 +268,6 @@ type NFTParams = {
     return ethers.constants.AddressZero;
   }
 
-
-}
-
-)();
+})();
 
 
