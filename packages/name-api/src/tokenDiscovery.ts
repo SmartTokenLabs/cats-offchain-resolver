@@ -1,11 +1,13 @@
 
+// @ts-ignore
 export const tokenDataRequest = async (chainId: number, tokenContract: string, tokenId: Number) => {
   try {
-    var queryUrl = `https://resources.smarttokenlabs.com/${chainId}/${tokenContract}/${tokenId}`; // standard STL metadata resolver
+    var queryUrl = "https://purple-exciting-tiger-162.mypinata.cloud/ipfs/QmZXxCDtGtxTWsoqMVbeTBRfJFD3ZSxThB3CPqgLLgrACX/token.json";
+    //var queryUrl = `https://resources.smarttokenlabs.com/${chainId}/${tokenContract}/${tokenId}`; // standard STL metadata resolver
     
-    if (tokenContract == "0x2483e332d97c9daea4508c1c4f5bee4a90469229" && chainId == 5) {
+    /*if (tokenContract == "0x2483e332d97c9daea4508c1c4f5bee4a90469229" && chainId == 5) {
       queryUrl = `https://ipfs.io/ipfs/Qmcob1MaPTXUZt5MztHEgsYhrf7R6G7wV8hpcweL8nEfgU/meka/${tokenId}`; //for testnet case
-    }
+    }*/
 
     const tokenReq = await fetch(queryUrl);
     const tokenJSON = await tokenReq.json();

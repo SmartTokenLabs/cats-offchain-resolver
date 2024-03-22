@@ -2,13 +2,18 @@ import { Command } from 'commander';
 import ethers from 'ethers';
 //@ts-ignore
 import fetch from 'node-fetch';
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const { PRIVATE_KEY, INFURA_KEY } = process.env;
 
 const program = new Command();
 program
-  .requiredOption('-r --registry <address>', 'ENS registry address') //0x4dBFD41eA7639eB5FbC95e4D2Ea63369e7Be143f <<-- resolver, registry is 0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5
-  .option('-p --provider <url>', 'web3 provider URL', 'http://127.0.0.1:8545') //https://ethereum-goerli.publicnode.com
-  .option('-i --chainId <chainId>', 'chainId', '31337') //5
-  .option('-n --chainName <name>', 'chainName', 'hardhat') //Goerli
+  .requiredOption('-r --registry <address>', 'ENS registry address', '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e') //0x4dBFD41eA7639eB5FbC95e4D2Ea63369e7Be143f <<-- resolver, registry is 0x283Af0B28c62C092C9727F1Ee09c02CA627EB7F5
+  .option('-p --provider <url>', 'web3 provider URL', `https://sepolia.infura.io/v3/${INFURA_KEY}`) //https://ethereum-goerli.publicnode.com
+  .option('-i --chainId <chainId>', 'chainId', '11155111') //5
+  .option('-n --chainName <name>', 'chainName', 'sepolia') //Goerli
   .argument('<name>');
 
 program.parse(process.argv);
@@ -25,7 +30,7 @@ const provider = new ethers.providers.JsonRpcProvider(options.provider, {
 // Define the ENS resolver contract address for now, will add dynamic resolution if needed
 //const ensResolverAddress = '0x8464135c8F25Da09e49BC8782676a84730C318bC';
 //const ensResolverAddress = '0x02957D5823c1C973f2075d870985c856b6D1b93E';
-const ensResolverAddress = '0xeE6a307cdFe7Ee16988BF73Dfd0D001B3f200bD5'; //testnet
+//const ensResolverAddress = '0xeE6a307cdFe7Ee16988BF73Dfd0D001B3f200bD5'; //testnet
 
 //@ts-ignore
 const returnAbi = [
@@ -87,12 +92,106 @@ const decodeAbi = [
   }
 ];
 
+// @ts-ignore
+async function postUrl(url: string): Promise<string> {
+  try {
+      const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(""),
+      });
+
+      if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      console.log('Response:', responseData);
+      return JSON.stringify(responseData);
+  } catch (error) {
+      console.error('Failed to post:', error);
+  }
+
+  return "failed";
+}
+
 (async () => {
+  // @ts-ignore
   const name = program.args[0];
   //let resolver = await provider.getResolver(name); //TODO: This may be updated
-  let userAddress = await resolve(name, ensResolverAddress);
-  console.log(`UserAddress: ${userAddress}`);
 
+  //let resolver = await provider.getResolver(name);
+
+  //let ethMainnetAddress = await resolver!!.getAddress();
+
+  //console.log(`ADDR: ${ethMainnetAddress}`);
+
+  let pk: string = PRIVATE_KEY!;
+  // @ts-ignore
+  const wallet = new ethers.Wallet(pk);
+
+  // 1. Register token
+  //register on xNFT (will be sepolia)
+  //let tokenAddr = "0x4ffb1b3c2464644ba3436de3fc81a5d79cdf5760";
+  // @ts-ignore
+  let catsTokenAddr = "0xa04664f6191d9a65f5f48c6f9d6dd81cb636e65c";
+  // @ts-ignore
+  let chainId = 11155111;
+  // @ts-ignore
+  let tokenId = 5;
+  let tokenName = name;
+  let tokenIdName = "max";
+
+
+  /*const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
+
+  console.log(`MSG: ${message}`);
+
+  const signature = await wallet.signMessage(message);
+  console.log('Signature: ', signature);
+
+  let callUrl = `http://10.191.8.133:8083/registertoken/${chainId}/${catsTokenAddr}/${tokenName}/${signature}/${chainId}`;
+
+  console.log(`CALL: ${callUrl}`);
+
+  const response = await postUrl(callUrl);
+
+  console.log(`RSP: ${response}`);*/
+
+
+
+  // 2. Create 6551 name
+  // /register/:chainId/:tokenContract/:tokenId/:name/:signature 
+  /*let registerMsg = `Registering your catId ${tokenId} name to ${tokenIdName}.${tokenName}`;
+  const signature2 = await wallet.signMessage(registerMsg);
+  console.log('Signature: ', signature2);
+  let callUrl2 = `http://10.191.8.133:8083/register/${chainId}/${catsTokenAddr}/${tokenId}/${tokenIdName}.${tokenName}/${signature2}`;
+  console.log(`CALL: ${callUrl2}`);
+  const response2 = await postUrl(callUrl2);
+
+  console.log(`RSP: ${response2}`);*/
+  // 3. resolve name
+  // 4. Resolve image
+  // 5. Storage
+
+  //now resolve
+  let resolver = await provider.getResolver(`${tokenIdName}.${tokenName}`);
+
+  //ethMainnetAddress = await resolver!!.getAddress();
+
+  //console.log(`ADDR: ${ethMainnetAddress}`);
+
+  //resolve image
+  let avatarUrl = await resolver!!.getAvatar();
+
+  console.log(`AVATAR: ${JSON.stringify(avatarUrl)}`);
+
+
+
+
+  // @ts-ignore
   async function resolve(name: string, resolverAddress: string): Promise<string> {
     const namehash = ethers.utils.namehash(name);
     const dnsEncode = ethers.utils.dnsEncode(name);

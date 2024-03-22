@@ -12,16 +12,6 @@ let { PRIVATE_KEY, ETHERSCAN_API_KEY, INFURA_KEY } = process.env;
 
 PRIVATE_KEY = PRIVATE_KEY ? PRIVATE_KEY : "0x2222453C7891EDB92FE70662D5E45A453C7891EDB92FE70662D5E45A453C7891";
 
-// This is a sample Hardhat task. To learn how to create your own go to
-// https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (args, hre) => {
-  const accounts = await hre.ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(account.address);
-  }
-});
-
 // module.exports = {
 //   networks: {
 //     mainnet: {
@@ -65,9 +55,9 @@ export default {
       accounts: [`${PRIVATE_KEY}`]
     },
     goerli: {
-      url: `https://ethereum-goerli.publicnode.com`, //ths RPC seems to work more consistently
+      url: `https://goerli.infura.io/v3/${INFURA_KEY}`, //ths RPC seems to work more consistently
       accounts: [`${PRIVATE_KEY}`],
-      gasPrice: 2000000000
+      gasPrice: 20000000000
     },
     bsc: {
       url: `https://bsc-dataseed1.binance.org:443`,
@@ -79,6 +69,10 @@ export default {
     },
     polygon: {
       url: `https://matic-mainnet.chainstacklabs.com`,
+      accounts: [`${PRIVATE_KEY}`]
+    },
+    sepolia: {
+      url: `https://sepolia.infura.io/v3/${INFURA_KEY}`,
       accounts: [`${PRIVATE_KEY}`]
     }
   },

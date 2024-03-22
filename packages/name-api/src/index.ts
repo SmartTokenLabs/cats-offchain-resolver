@@ -1,7 +1,7 @@
 // @ts-nocheck
 import fastify from "fastify";
-import { ethers } from "ethers";
-import { SQLiteDatabase } from "./sqlite";
+import { ethers, ZeroAddress } from "ethers";
+import { SQLiteDatabase, BaseNameDef } from "./sqlite";
 import fs from 'fs';
 import { tokenDataRequest } from "./tokenDiscovery";
 import fetch, {
@@ -24,10 +24,11 @@ if (!globalThis.fetch) {
   globalThis.Response = Response
 }
 
-import { CHAIN_CONFIG, CONTRACT_CONFIG, PATH_TO_CERT, SQLite_DB_FILE } from "./constants";
+import { PATH_TO_CERT, SQLite_DB_FILE } from "./constants";
 
 import cors from '@fastify/cors';
 import { getTokenBoundAccount, getTokenBoundNFT } from "./tokenBound";
+import { resolveEnsName, userOwnsDomain, getProvider, getBaseName } from "./resolve";
 
 const db: SQLiteDatabase = new SQLiteDatabase(
   SQLite_DB_FILE, // e.g. 'ensnames.db'
@@ -39,15 +40,33 @@ var app;
 var lastError: string[] = [];
 var coinTypeRoute: string[] = [];
 
+const RESOLVE_FAKE_ADDRESS = "0x0000000000000000000000000000000000000060";
+const NAME_LIMIT = 128;
+
 interface QueryResult {
   owns: boolean;
   timeStamp: number;
 }
 
+enum ResolverStatus {
+  CORRECTLY_SETUP,
+  INTERMEDIATE_DOMAIN_NOT_SET,
+  BASE_DOMAIN_NOT_POINTING_HERE
+}
+
+interface ResolverCheck {
+  name: string,
+  resolverContract: string,
+  onChainName: string,
+  nameResolve: string
+}
+
 let cachedResults = new Map<string, QueryResult>();
+let resolverChecks = new Map<string, ResolverCheck>();
 
 const cacheTimeout = 30 * 1000; // 30 second cache validity
 const logDumpLimit = 2000; //allow 2000 logs to be dumped
+const resolverCheckLimit = 10; //only keep 10 checks in memory
 
 if (PATH_TO_CERT) {
   app = fastify({
@@ -68,8 +87,17 @@ await app.register(cors, {
   origin: true
 })
 
+//1. Register token:
+// /registerToken/:chainId/:tokenContract/:name/:signature/:ensChainId? Signature is `Attempting to register domain ${name} name to ${tokenContract}`
+//2. Register individual name:
+// /register/:chainId/:tokenContract/:tokenId/:name/:signature
+//3. Resolve for chain
+
 async function getTokenImage(name: string, tokenId: number) {
-  let { chainId, tokenContract } = getTokenLocation(name);
+  console.log(`blah`);
+  let { chainId, tokenContract } = db.getTokenLocation(name);
+
+  console.log(`${chainId} ${tokenContract}`);
 
   if (tokenContract) {
     const tokenData = await tokenDataRequest(chainId, tokenContract, tokenId);
@@ -79,35 +107,16 @@ async function getTokenImage(name: string, tokenId: number) {
   }
 }
 
-// TODO: This should be sourced from a database sub-table
-function getTokenLocation(name: string): { number, string } {
-  var tokenContract: string;
-  var chainId: number;
-  const baseName = getBaseName(name);
-  console.log("Base name: " + baseName);
-
-  switch (baseName) {
-    case 'smartcat.eth':
-      tokenContract = "0x2483e332d97c9daea4508c1c4f5bee4a90469229";
-      chainId = 5;
-      break;
-    case 'thesmartcats.eth':
-      tokenContract = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
-      chainId = 137;
-      break;
-  }
-
-  return { chainId, tokenContract };
-}
-
-app.get('/text/:name/:key', async (request, reply) => {
+app.get('/text/:name/:key/:addr', async (request, reply) => {
   const recordName = request.params.name;
   const recordKey = request.params.key; // e.g. Avatar
+  console.log(`Avatar ${recordName}`);
   if (!recordKey || !recordName) return "";
   addCointTypeCheck(`${recordName} Text Request: ${recordKey}`);
   switch (recordKey.toLowerCase()) {
     case 'avatar':
       const tokenId: number = db.getTokenIdFromName(recordName);
+      console.log(`tokenId ${tokenId}`);
       if (tokenId == -1) {
         return "";
       } else {
@@ -146,7 +155,7 @@ app.get('/droptables/:page', async (request, reply) => {
   return list;
 });
 
-// input: tokenbound address
+// input: tokenbound address NB this is only for smartcat
 app.get('/name/:address/:tokenid?', async (request, reply) => {
   const address = request.params.address;
   const tokenId = request.params.tokenid;
@@ -154,7 +163,7 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
   const fetchedName = db.getNameFromAddress(address);
   if (fetchedName && tokenId) {
     // check if TBA matches calc:
-    let { chainId, tokenContract } = getTokenLocation(fetchedName);
+    let { chainId, tokenContract } = db.getTokenLocation(fetchedName);
     if (tokenContract) {
       const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
       //console.log(`fromUser: ${address} calc:${tbaAccount}`);
@@ -167,11 +176,39 @@ app.get('/name/:address/:tokenid?', async (request, reply) => {
   return fetchedName;
 });
 
-app.get('/addr/:name/:coinType', async (request, reply) => {
+app.get('/getname/:chainid/:address/:tokenid', async (request, reply) => {
+  const address = request.params.address;
+  const tokenId = request.params.tokenid;
+  const chainid = request.params.chainid;
+  console.log("getName Addr: " + address + " tokenid " + tokenId + " chainid " + chainid);
+  return db.getNameFromToken(chainid, address, tokenId);
+});
+
+function resolveCheckIntercept(dName: string, resolverAddress: string): boolean {
+  //console.log(`intercept ${dName} ${resolverAddress}`);
+  let bIndex = dName.indexOf('.');
+  if (bIndex >= 0) {
+    let pName = dName.substring(0, bIndex);
+    //console.log(`ICheck ${pName}`);
+    if (resolverChecks.has(pName)) {
+      //now ensure the rest of the key exists in the database if it's a subdomain
+      resolverChecks.set(pName, { name: dName, resolverContract: resolverAddress, onChainName: "" });
+      //console.log(`Added! ${dName} ${resolverAddress}`);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+app.get('/addr/:name/:coinType/:resolverAddr', async (request, reply) => {
+  if (resolveCheckIntercept(request.params.name, request.params.resolverAddr)) { 
+    return { addr: RESOLVE_FAKE_ADDRESS }; //If we get to this point, then the onchain part of the resolver is working correctly
+  }
   const name = request.params.name;
   const coinType = request.params.coinType;
   addCointTypeCheck(`${name} Attempt to resolve: ${coinType}`);
-  return db.addr(name, coinType)
+  return db.addr(name, coinType);
 });
 
 app.get('/count', async (request, reply) => {
@@ -236,39 +273,200 @@ app.get('/coinTypes', async (request, reply) => {
 
 // restrict size
 function addCointTypeCheck(text: string) {
-  coinTypeRoute.push(`${recordName} Text Request: ${recordKey}`);
+  coinTypeRoute.push(`${text}`);
 
   if (coinTypeRoute.length > (logDumpLimit * 2)) {
     coinTypeRoute.splice(0, logDumpLimit * 2);
   }
 }
 
-app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature', async (request, reply) => {
+//Resolver check:
+async function sendResolverRequest(baseName: string, chainId: number): Promise<string> {
+  //1. send request
+  let bytes = ethers.randomBytes(8);
+  let nameHash = ethers.hexlify(bytes);
+  console.log(`Resolve: ${nameHash}.${baseName}`);
+  //kick off process to call the resolve and write the base resolver name in - we need this to check ownership
+  resolveEnsName(baseName, nameHash, chainId)
+    .then(({ userAddr, onChainName }) => {
+      //console.log(`RT: ${userAddr} ${onChainName}`);
+      let thisCheck = resolverChecks.get(nameHash);
+      thisCheck!.onChainName = onChainName;
+      thisCheck!.nameResolve = userAddr;
+      /*if (userAddr !== ZeroAddress && onChainName !== null) {
+        console.log(`RESOLVE: ${onChainName} ${userAddr} ${nameHash}`);
+      } else {
+        console.log(`baseName ${baseName} not resolved`);
+      }*/
+      resolverChecks.set(nameHash, thisCheck);
+    });
 
-  const { chainId, tokenContract, tokenId, name, signature } = request.params;
+  resolverChecks.set(nameHash, { name: "", resolverContract: "" });
 
-  const config = CONTRACT_CONFIG[chainId + "-" + tokenContract.toLowerCase()];
+  console.log(`Wait for Resolve: ${nameHash}`);
 
-  if (!config)
-    return reply.status(400).send("Invalid chain and address combination");
+  return nameHash;
+}
 
-  if (!db.checkAvailable(name))
-    return reply.status(403).send("Name Unavailable");
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForCheck(nameHash: string): Promise<ResolverStatus> {
+
+  let resolved: ResolverStatus = ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE;
+
+  for (let i = 0; i < 1000; i++) {
+    await delay(1000);
+    let thisCheck = resolverChecks.get(nameHash);
+    if (thisCheck?.name.length > 0 && thisCheck?.onChainName.length > 0) {
+      console.log(`Resolved! ${thisCheck?.resolverContract} ${thisCheck?.onChainName} ${thisCheck?.nameResolve}`);
+      // TODO: Possibly check that returned address is always the FAKE address, if it's set to a real address then we've got an error
+      //       However this should have been caught in the database check
+      if (thisCheck?.nameResolve === ZeroAddress) {
+        resolved = ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET;
+      } else {
+        resolved = ResolverStatus.CORRECTLY_SETUP;
+      }
+      break;
+    }
+  }
+
+  resolverChecks.set(nameHash, null);
+
+  return resolved;
+}
+
+async function testResolve(): Promise<string> {
+  //now check that resolver contract is correct
+  let nameCheck = "xnft.eth";
+  let nameHash = await sendResolverRequest(nameCheck, 11155111); //test on sepolia
+
+  let result = await waitForCheck(nameHash);
+
+  if (result == ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE) {
+    console.log(`Resolver not correctly set for gateway.`);
+  } else if (result == ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET) {
+    console.log(`Intermediate name resolver ${nameCheck} not set correctly.`);
+  }
+
+  return result;
+}
+
+app.post('/registertoken/:chainId/:tokenContract/:name/:signature/:ensChainId?', async (request, reply) => {
+
+  const { chainId, tokenContract, name, signature, ensChainId } = request.params;
+
+  const baseName = name;
+
+  const numericChainId: number = Number(chainId);
+  const numericEnsChainId: number = Number(ensChainId);
+
+  const santisedName = baseName.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
+
+  console.log(`Sanitised name: ${santisedName}`);
+
+  if (santisedName !== baseName) {
+    return reply.status(403).send(`This name contains illegal characters ${baseName} vs ${santisedName}`);
+  }
+
+  if (baseName.length > NAME_LIMIT) {
+    return reply.status(403).send(`Domain name too long, limit is ${NAME_LIMIT} characters.`);
+  }
+
+  console.log(`Check DB for basename `);
+
+  //first check if basename already exists
+  if (!db.checkBaseNameAvailable(baseName)) {
+    return reply.status(403).send(`Base name ${baseName} already used`);
+  }
+
+  console.log(`Check DB for tokencontract `);
+
+  if (!db.checkTokenContractAlreadyRegistered(tokenContract)) {
+    return reply.status(403).send(`Token Contract ${tokenContract} already registered`);
+  }
+
+  console.log(`Check resolver ${baseName} (${getBaseName(baseName)})`);
+
+  //now check that resolver contract is correct
+  let nameHash = await sendResolverRequest(getBaseName(baseName), numericEnsChainId !== null ? numericEnsChainId : 1); // use ENS Chain if specified to allow testnet dev
+  let result = await waitForCheck(nameHash);
+
+  if (result == ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE) {
+    return reply.status(403).send(`Resolver not correctly set for gateway.`);
+  } else if (result == ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET) {
+    return reply.status(403).send(`Intermediate name resolver ${getBaseName(baseName)} not set correctly.`);
+  }
+
+  try {
+    const applyerAddress = recoverRegistrationAddress(name, tokenContract, signature);
+    console.log("Registration address: " + applyerAddress);
+
+    //check if address owns this name (either onchain, or registered here)
+    const userOwns = await userOwnsDomain(getBaseName(baseName), baseName, applyerAddress, numericChainId);
+
+    console.log(`OWNS: ${userOwns}`);
+
+    if (userOwns) {
+    //if (true) { //TODO: Debug
+      //create entry in database
+      // const chainInt = parseInt(chainId);
+      // const tbaAccount = getTokenBoundAccount(chainInt, tokenContract, tokenId);
+      // console.log("TBA: " + tbaAccount);
+      db.registerBaseDomain(baseName, tokenContract, numericChainId);
+      return reply.status(200).send("{ 'result': 'Pass' }");
+    } else {
+      // @ts-ignore
+      return reply.status(403).send("User does not own the NFT or signature is invalid");
+    }
+  } catch (e) {
+    if (lastError.length < 1000) { // don't overflow errors
+      lastError.push(e.message);
+    }
+    
+    return reply.status(400).send(e.message);
+  }
+});
+
+app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature/:ensAddress?', async (request, reply) => {
+
+  const { chainId, tokenContract, tokenId, name, signature, ensAddress } = request.params;
+
+  const numericChainId: number = Number(chainId);
+
+  if (!db.checkAvailable(name)) {
+    let returnMsg = { "error" : "Name Unavailable" };
+    return reply.status(403).send(returnMsg);
+  }
+
+  //now check domain name is possible to use - must be an entry in the tokens database
+  //remove front name:
+  let baseName = getBaseName(name);
+  console.log(`BaseName: ${baseName}`);
+  if (db.checkBaseNameAvailable(baseName)) {
+    //this basename hasn't yet been registered
+    return reply.status(403).send(`Basename ${baseName} not registered on the server, cannot create this domain name`);
+  }
 
   try {
     const applyerAddress = recoverAddress(name, tokenId, signature);
     console.log("APPLY: " + applyerAddress);
 
     //now determine if user owns the NFT
-    const userOwns = await userOwnsNFT(chainId, tokenContract, applyerAddress, tokenId);
+    const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
 
     if (userOwns) {
-      const chainInt = parseInt(chainId);
-      const tbaAccount = getTokenBoundAccount(chainInt, tokenContract, tokenId);
-      console.log("TBA: " + tbaAccount);
+      let ensPointAddress = getTokenBoundAccount(numericChainId, tokenContract, tokenId);
+      
+      if (ensAddress && ethers.isAddress(ensAddress)) {
+        ensPointAddress = address;
+      }
 
-      db.addElement(config.baseName, name, tbaAccount, chainInt, tokenId);
-      return reply.status(200).send("pass");
+      console.log("Account: " + ensPointAddress);
+
+      db.addElement(name, ensPointAddress, numericChainId, tokenId);
+      return reply.status(200).send({ "result" : "pass" });
     } else {
       return reply.status(403).send("User does not own the NFT or signature is invalid");
     }
@@ -287,9 +485,19 @@ function recoverAddress(catName: string, tokenId: string, signature: string): st
   return ethers.verifyMessage(message, addHexPrefix(signature));
 }
 
-async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddress: string, tokenId: string): Promise<boolean> {
+function recoverRegistrationAddress(name: string, tokenContract: string, signature: string): string {
+  const message = `Attempting to register domain ${name} name to ${tokenContract}`;
+  console.log("MSG: " + message);
+  console.log(`SIG: ${signature}`);
+  if (signature.length < 130 || signature.length > 132) {
+    console.log(`ERROR: ${signature.length}`);
+    return ZeroAddress;
+  } else {
+    return ethers.verifyMessage(message, addHexPrefix(signature));
+  }
+}
 
-  const chainConfig = CHAIN_CONFIG[chainId];
+async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddress: string, tokenId: string): Promise<boolean> {
 
   if (!chainId)
     throw new Error("Missing chain config");
@@ -299,7 +507,7 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
     return useCachedValue(chainId, contractAddress, applyerAddress, tokenId);
   }
 
-  const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl);
+  const provider = getProvider(chainId);
 
   const testCatsContract = new ethers.Contract(contractAddress, [
     'function ownerOf(uint256 tokenId) view returns (address)'
@@ -359,11 +567,6 @@ function addHexPrefix(hex: string): string {
   }
 }
 
-function getBaseName(name: string): string {
-  let parts = name.split('.');
-  return parts.slice(1).join('.');
-}
-
 function checkCacheEntries() {
   //check cache and clear old values
   let removeResultKeys: string[] = [];
@@ -387,9 +590,11 @@ const start = async () => {
 
   try {
     await app.listen({ port: 8083, host: '0.0.0.0' });
-    console.log(`Server is listening on ${app.server?.address().port}`);
+    console.log(`Server is listening on ${app.server?.address()} ${app.server?.address().port}`);
+
     db.initDb();
     setInterval(checkCacheEntries, cacheTimeout * 2);
+    testResolve();
   } catch (err) {
     console.log(err);
     app.log.error(err);

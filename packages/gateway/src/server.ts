@@ -46,22 +46,23 @@ const queryHandlers: {
     dataPath: string,
     name: string,
     ttlVal: number,
-    args: Result
+    resolverAddr: string,
+    args: Result,
   ) => Promise<DatabaseResult>;
 } = {
   // @ts-ignore
-  'addr(bytes32)': async (dataPath, name, ttlVal, _args) => { 
-    return await resolve(dataPath, name, ETH_COIN_TYPE, ttlVal);
+  'addr(bytes32)': async (dataPath, name, ttlVal, resolverAddr, _args) => { 
+    return await resolve(dataPath, name, ETH_COIN_TYPE, ttlVal, resolverAddr);
   },
   // @ts-ignore
-  'addr(bytes32,uint256)': async (dataPath, name, ttlVal, args) => { 
+  'addr(bytes32,uint256)': async (dataPath, name, ttlVal, resolverAddr, args) => { 
     const coinType = <number>args[0];
-    return await resolve(dataPath, name, coinType, ttlVal);
+    return await resolve(dataPath, name, coinType, ttlVal, resolverAddr);
   },
   // @ts-ignore
-  'text(bytes32,string)': async (dataPath, name, ttlVal, args) => {
+  'text(bytes32,string)': async (dataPath, name, ttlVal, resolverAddr, args) => {
     try {
-      const addrReq = await fetch(`${dataPath}/text/${name}/${args[0]}`);
+      const addrReq = await fetch(`${dataPath}/text/${name}/${args[0]}/${resolverAddr}`);
       const text = await addrReq.text();
       return { result: [text], ttl:ttlVal };
     } catch (error) {
@@ -70,17 +71,17 @@ const queryHandlers: {
     }
   },
   // @ts-ignore
-  'contenthash(bytes32)': async (dataPath, name, ttlVal, _args) => {
+  'contenthash(bytes32)': async (dataPath, name, ttlVal, resolverAddr, _args) => {
     //const { contenthash, ttl } = await db.contenthash(name);
     const contenthash = null;
     return { result: [contenthash], ttl:ttlVal };
   },
 };
 
-async function resolve(dataPath: string, name: string, coinType: number, ttlVal: number){
-
+async function resolve(dataPath: string, name: string, coinType: number, ttlVal: number, resolverAddr: string) {
   try {
-    const addrReq = await fetch(`${dataPath}/addr/${name}/${coinType}`);
+    console.log(`${dataPath}/addr/${name}/${coinType}/${resolverAddr}`);
+    const addrReq = await fetch(`${dataPath}/addr/${name}/${coinType}/${resolverAddr}`);
     const resp = await addrReq.json();
     return { result: [resp.addr], ttl:ttlVal };
   } catch (error) {
@@ -93,7 +94,8 @@ async function query(
   dataPath: string,
   ttlVal: number,
   name: string,
-  data: string
+  data: string,
+  resolverAddr: string
 ): Promise<{ result: BytesLike; validUntil: number }> {
   // Parse the data nested inside the second argument to `resolve`
   const { signature, args } = Resolver.parseTransaction({ data });
@@ -103,7 +105,7 @@ async function query(
   }
 
   if (ethers.utils.namehash(name) !== args[0]) {
-    throw new Error('Name does not match namehash');
+    throw new Error('Name does not match namehash'); 
   }
 
   const handler = queryHandlers[signature];
@@ -111,7 +113,7 @@ async function query(
     throw new Error(`Unsupported query function ${signature}`);
   }
 
-  const { result, ttl } = await handler(dataPath, name, ttlVal, args.slice(1));
+  const { result, ttl } = await handler(dataPath, name, ttlVal, resolverAddr, args.slice(1));
   return {
     result: Resolver.encodeFunctionResult(signature, result),
     validUntil: Math.floor(Date.now() / 1000 + ttl),
@@ -120,14 +122,18 @@ async function query(
 
 export function makeServer(signer: ethers.utils.SigningKey, dataPath: string, ttl: number) {
   const server = new Server();
-  server.add(IResolverService_abi, [
+  console.log(`${JSON.stringify(IResolverService_abi)}`);
+  const resolverABI = JSON.parse('[{"inputs":[{"internalType":"bytes","name":"name","type":"bytes"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"resolve","outputs":[{"internalType":"bytes","name":"result","type":"bytes"},{"internalType":"uint64","name":"expires","type":"uint64"},{"internalType":"bytes","name":"sig","type":"bytes"}],"stateMutability":"view","type":"function"}]');
+  server.add(resolverABI, [
     {
       type: 'resolve',
       func: async ([encodedName, data]: Result, request) => {
         const name = decodeDnsName(Buffer.from(encodedName.slice(2), 'hex'));
-        console.log("Request: " + name);
+        const resolverAddr: string = request.to.toString();
+        //console.log(`name: ${name} dataPath ${dataPath} ${data} ${request}`);
+        console.log(`Request: ${resolverAddr}`);
         // Query the database
-        const { result, validUntil } = await query(dataPath, ttl, name, data);
+        const { result, validUntil } = await query(dataPath, ttl, name, data, resolverAddr);
 
         console.log("Request from DB: " + result + " : " + validUntil);
 
