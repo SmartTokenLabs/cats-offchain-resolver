@@ -33,6 +33,11 @@ export class SQLiteDatabase {
 
   constructor(dbName: string) {
     this.db = new BetterSqlite3(dbName, { verbose: console.log });
+
+    // this.db.exec(`
+    //     DROP TABLE names;
+    // `)
+    
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS names (
         name TEXT PRIMARY KEY,
@@ -42,9 +47,9 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
 
-    /*this.db.exec(`
-        DROP TABLE tokens;
-    `)*/
+    // this.db.exec(`
+    //     DROP TABLE tokens;
+    // `)
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS tokens (
@@ -54,9 +59,9 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
     `);
 
-    this.db.exec(`
-        DROP TABLE address_overrides;
-    `)
+    // this.db.exec(`
+    //     DROP TABLE address_overrides;
+    // `)
 
     // this table is for if you want to set a specific ENS address for a given token
     this.db.exec(`

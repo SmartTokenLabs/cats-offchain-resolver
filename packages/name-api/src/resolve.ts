@@ -29,7 +29,7 @@ const STL_DOMAINS: Record<string, number[]> = {
 export function getProvider(useChainId: number): ethers.JsonRpcProvider | null {
     const chainDetails: ChainDetail = CHAIN_DETAILS[useChainId];
 
-    console.log(`CHAIN ${chainDetails.RPCurl} ${chainDetails.name} ${useChainId}`);
+    //console.log(`CHAIN ${chainDetails.RPCurl} ${chainDetails.name} ${useChainId}`);
 
     if (chainDetails !== null) {
         return new ethers.JsonRpcProvider(chainDetails.RPCurl, {
@@ -117,6 +117,7 @@ async function resolverFromName(name: string, chainId: number): Promise<{resolve
 
         // Found a resolver!
         if (addr != null) {
+            //console.log(`RSV: ${addr}`);
             return {resolver: addr, resolvingName: currentName};
         }
 
@@ -155,7 +156,7 @@ async function resolve(name: string, offchainResolverAddress: string, chainId: n
     const dnsEncode = ethers.dnsEncode(name);
     const funcEncode = "0x3b3b57de" + namehash.substring(2);
 
-    console.log(`OFFCH: ${offchainResolverAddress}`);
+    //console.log(`OFFCH: ${offchainResolverAddress}`);
 
     const catResolver = new ethers.Contract(offchainResolverAddress, [
       'function resolve(bytes name, bytes data) view returns (bytes)',
@@ -191,7 +192,7 @@ async function resolve(name: string, offchainResolverAddress: string, chainId: n
 
           //now call proof
           const proofReturn = await catResolver.resolveWithProof(proofResponse, extraData);
-          console.log(proofReturn);
+          //console.log(proofReturn);
 
           //console.log("Len: " + proofReturn.length);
           var truncated = proofReturn;
@@ -233,14 +234,14 @@ export async function resolveEnsName(baseName: string, hashName: string, chainId
 export async function userOwnsDomain(baseName: string, domainName: string, applyerAddress: string, chainId: number): Promise<boolean> {
 
     //first check if this is a 'free' domain
-    console.log(`DOM: ${domainName}`);
+    //console.log(`DOM: ${domainName}`);
     // @ts-ignore
     let knownDomain = STL_DOMAINS[baseName];
     if (knownDomain && knownDomain.includes(chainId)) {
         return true; //allowed to use
     }
 
-    console.log(`ADR: ${applyerAddress}`);
+    //console.log(`ADR: ${applyerAddress}`);
 
     const testDomainOwner = new ethers.Contract(ENS_REGISTRY, [
       'function owner(bytes32 nodeHash) view returns (address)'
@@ -253,7 +254,7 @@ export async function userOwnsDomain(baseName: string, domainName: string, apply
         return true;
     }
 
-    console.log(`ADR: ${applyerAddress}`);
+    //console.log(`ADR: ${applyerAddress}`);
 
     //could be namewrapper
     const testNameWrapper = new ethers.Contract(owner, [
@@ -262,7 +263,7 @@ export async function userOwnsDomain(baseName: string, domainName: string, apply
 
     const resolveWrappedOwnership = await testNameWrapper.ownerOf(ethers.namehash(domainName));
 
-    console.log(`Wrap Owner: ${resolveWrappedOwnership}`);
+    //console.log(`Wrap Owner: ${resolveWrappedOwnership}`);
 
     return resolveWrappedOwnership == applyerAddress;
   }

@@ -185,7 +185,7 @@ app.get('/getname/:chainid/:address/:tokenid', async (request, reply) => {
 });
 
 function resolveCheckIntercept(dName: string, resolverAddress: string): boolean {
-  //console.log(`intercept ${dName} ${resolverAddress}`);
+  console.log(`intercept ${dName} ${resolverAddress}`);
   let bIndex = dName.indexOf('.');
   if (bIndex >= 0) {
     let pName = dName.substring(0, bIndex);
@@ -367,24 +367,24 @@ app.post('/registertoken/:chainId/:tokenContract/:name/:signature/:ensChainId?',
   console.log(`Sanitised name: ${santisedName}`);
 
   if (santisedName !== baseName) {
-    return reply.status(403).send(`This name contains illegal characters ${baseName} vs ${santisedName}`);
+    return reply.status(403).send({"fail": `This name contains illegal characters ${baseName} vs ${santisedName}`});
   }
 
   if (baseName.length > NAME_LIMIT) {
-    return reply.status(403).send(`Domain name too long, limit is ${NAME_LIMIT} characters.`);
+    return reply.status(403).send({"fail": `Domain name too long, limit is ${NAME_LIMIT} characters.`});
   }
 
   console.log(`Check DB for basename `);
 
   //first check if basename already exists
   if (!db.checkBaseNameAvailable(baseName)) {
-    return reply.status(403).send(`Base name ${baseName} already used`);
+    return reply.status(403).send({"fail": `Base name ${baseName} already used`});
   }
 
   console.log(`Check DB for tokencontract `);
 
   if (!db.checkTokenContractAlreadyRegistered(tokenContract)) {
-    return reply.status(403).send(`Token Contract ${tokenContract} already registered`);
+    return reply.status(403).send({"fail": `Token Contract ${tokenContract} already registered`});
   }
 
   console.log(`Check resolver ${baseName} (${getBaseName(baseName)})`);
@@ -394,9 +394,9 @@ app.post('/registertoken/:chainId/:tokenContract/:name/:signature/:ensChainId?',
   let result = await waitForCheck(nameHash);
 
   if (result == ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE) {
-    return reply.status(403).send(`Resolver not correctly set for gateway.`);
+    return reply.status(403).send({"fail": `Resolver not correctly set for gateway.`});
   } else if (result == ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET) {
-    return reply.status(403).send(`Intermediate name resolver ${getBaseName(baseName)} not set correctly.`);
+    return reply.status(403).send({"fail": `Intermediate name resolver ${getBaseName(baseName)} not set correctly.`});
   }
 
   try {
@@ -415,17 +415,17 @@ app.post('/registertoken/:chainId/:tokenContract/:name/:signature/:ensChainId?',
       // const tbaAccount = getTokenBoundAccount(chainInt, tokenContract, tokenId);
       // console.log("TBA: " + tbaAccount);
       db.registerBaseDomain(baseName, tokenContract, numericChainId);
-      return reply.status(200).send("{ 'result': 'Pass' }");
+      return reply.status(200).send({ "result" : "pass" });
     } else {
       // @ts-ignore
-      return reply.status(403).send("User does not own the NFT or signature is invalid");
+      return reply.status(403).send({"fail": "User does not own the NFT or signature is invalid"});
     }
   } catch (e) {
     if (lastError.length < 1000) { // don't overflow errors
       lastError.push(e.message);
     }
     
-    return reply.status(400).send(e.message);
+    return reply.status(400).send({"fail": e.message});
   }
 });
 
@@ -446,7 +446,7 @@ app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature/:ensAddres
   console.log(`BaseName: ${baseName}`);
   if (db.checkBaseNameAvailable(baseName)) {
     //this basename hasn't yet been registered
-    return reply.status(403).send(`Basename ${baseName} not registered on the server, cannot create this domain name`);
+    return reply.status(403).send({"fail": `Basename ${baseName} not registered on the server, cannot create this domain name`});
   }
 
   try {
@@ -468,14 +468,14 @@ app.post('/register/:chainId/:tokenContract/:tokenId/:name/:signature/:ensAddres
       db.addElement(name, ensPointAddress, numericChainId, tokenId);
       return reply.status(200).send({ "result" : "pass" });
     } else {
-      return reply.status(403).send("User does not own the NFT or signature is invalid");
+      return reply.status(403).send({"fail": "User does not own the NFT or signature is invalid"});
     }
   } catch (e) {
     if (lastError.length < 1000) { // don't overflow errors
       lastError.push(e.message);
     }
     
-    return reply.status(400).send(e.message);
+    return reply.status(400).send({"fail": e.message});
   }
 });
 
