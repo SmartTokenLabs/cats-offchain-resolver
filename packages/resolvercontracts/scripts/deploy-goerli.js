@@ -14,46 +14,59 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
 
     const goerliResolver = "0x763fD665d7081404c6BfEC5837A4E90c423eE522";
 
+    const sepoliaResolver = "0x7feaBb1a5597726662F480df407b4E9E81C91e28";
+    const sepoliaResolver2 = "0x155454A5d3252D5bEDc6F4C84177c669E420Ca4D";
+
     //resolver contract
 
     const prodUrl = "https://ens-gate.main.smartlayer.network/{sender}/{data}.json";
     const testUri = "https://ens-gate.test.smartlayer.network/{sender}/{data}.json";
-    const localTestUri = "http://44.217.178.162:8082/{sender}/{data}.json";
+    const localTestUri = "http://44.217.178.162:8082/{sender}/{data}.json";//44.217.178.162
     const pcTestUri = "http://192.168.50.206:8080/{sender}/{data}.json";
 
     const spaceCoTest = "http://10.191.8.133:8080/{sender}/{data}.json"; 
+    const google = "http://100.112.105.229:8080/{sender}/{data}.json"; 
+    const miccyphone = "http://192.168.43.187:8080/{sender}/{data}.json";
 
-    const signerProd = "0x9c4171b69E5659647556E81007EF941f9B042b1a"; 
+    const signerProd = "0x9c4171b69E5659647556E81007EF941f9B042b1a";
     const signerTest = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
     const localSigner = "0xC9A39015CB7c64c743815E55789ab63A321FB249";
+    const gatewayPrivate = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
     const smartcatNode = ethers.utils.namehash('smartcat.eth');
     const thesmartcatsNode = ethers.utils.namehash('thesmartcats.eth');
-    const xnftNode = ethers.utils.namehash('xnft');
+    const xnftNode = ethers.utils.namehash('xnft.eth');
 
-    const CustomResolver2 = await ethers.getContractFactory("OffchainResolver");
-    let customResolver = await CustomResolver2.attach("0xd70784f0fda5bf0918fee4f894c498e387f912ad");
+    //const CustomResolver2 = await ethers.getContractFactory("OffchainResolver");
+    //let customResolver = await CustomResolver2.attach("0xd70784f0fda5bf0918fee4f894c498e387f912ad");
     console.log("EVENT: ");
-    let updateUrl = await customResolver.connect(goerliKey).updateUrl(spaceCoTest);
-    await updateUrl.wait();
 
-    /*const Registry = await ethers.getContractFactory('ENSRegistry');
+
+    //let addSigner = await customResolver.connect(goerliKey).addSigner(gatewayPrivate);
+    //await addSigner.wait();
+    
+
+    const Registry = await ethers.getContractFactory('ENSRegistry');
     let registry = await Registry.attach(mainnetENSRegistry);
     let regAddr = String(registry.address);
     console.log(`Addr Registry : ${regAddr}`);
 
     //deploy resolver
     //const CustomResolver = await ethers.getContractFactory("OffchainResolver");
-    //let customResolver = await CustomResolver.connect(goerliKey).deploy(pcTestUri, [localSigner]);
+    //let customResolver = await CustomResolver.connect(goerliKey).deploy(pcTestUri, [localSigner, gatewayPrivate]);
     //await customResolver.deployed();
 
     const CustomResolver2 = await ethers.getContractFactory("OffchainResolver");
-    let customResolver = await CustomResolver2.attach("0xd70784f0fda5bf0918fee4f894c498e387f912ad"); 
+    let customResolver = await CustomResolver2.attach(sepoliaResolver2); 
 
     console.log(`New Resolver Addr : ${customResolver.address}`);
-    let localResolverAddr = customResolver.address;*/
+    let localResolverAddr = customResolver.address;
 
     console.log(`NAMEHASH: ${xnftNode}`);
+
+    //update URL
+    let updateUrl = await customResolver.connect(goerliKey).updateUrl(pcTestUri);
+    await updateUrl.wait();
 
     //set resolver
     //let updateResolverTx = await registry.connect(goerliKey).setResolver(xnftNode, localResolverAddr);

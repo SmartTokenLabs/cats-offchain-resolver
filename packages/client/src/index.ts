@@ -3,8 +3,18 @@ import ethers from 'ethers';
 //@ts-ignore
 import fetch from 'node-fetch';
 import dotenv from "dotenv";
+import { toUtf8Bytes } from 'ethers/lib/utils';
+import { concat } from 'ethers/lib/utils';
+import { hexZeroPad } from 'ethers/lib/utils';
+import { BigNumber } from 'ethers';
+// @ts-ignore
+import { hexlify } from 'ethers/lib/utils';
 
 dotenv.config();
+
+function bytes32ify(value: number): string {
+  return hexZeroPad(BigNumber.from(value).toHexString(), 32);
+}
 
 const { PRIVATE_KEY, INFURA_KEY } = process.env;
 
@@ -111,7 +121,7 @@ async function postUrl(url: string): Promise<string> {
       console.log('Response:', responseData);
       return JSON.stringify(responseData);
   } catch (error) {
-      console.error('Failed to post:', error);
+      return "API Call failed: " + error.message;
   }
 
   return "failed";
@@ -120,17 +130,16 @@ async function postUrl(url: string): Promise<string> {
 (async () => {
   // @ts-ignore
   const name = program.args[0];
-  //let resolver = await provider.getResolver(name); //TODO: This may be updated
-
-  //let resolver = await provider.getResolver(name);
-
-  //let ethMainnetAddress = await resolver!!.getAddress();
-
-  //console.log(`ADDR: ${ethMainnetAddress}`);
 
   let pk: string = PRIVATE_KEY!;
   // @ts-ignore
   const wallet = new ethers.Wallet(pk);
+
+  let gatewayServer = "http://192.168.50.206";
+  // @ts-ignore
+  let gatewayAddress = `${gatewayServer}:8080`;
+  // @ts-ignore
+  let registryAddress = `${gatewayServer}:8083`;
 
   // 1. Register token
   //register on xNFT (will be sepolia)
@@ -142,53 +151,134 @@ async function postUrl(url: string): Promise<string> {
   // @ts-ignore
   let tokenId = 5;
   let tokenName = name;
-  let tokenIdName = "max";
 
-
-  /*const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
+  const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
 
   console.log(`MSG: ${message}`);
 
   const signature = await wallet.signMessage(message);
   console.log('Signature: ', signature);
 
-  let callUrl = `http://10.191.8.133:8083/registertoken/${chainId}/${catsTokenAddr}/${tokenName}/${signature}/${chainId}`;
+  let callUrl = `${registryAddress}/registertoken/${chainId}/${catsTokenAddr}/${tokenName}/${signature}/${chainId}`;///${chainId}
 
   console.log(`CALL: ${callUrl}`);
 
   const response = await postUrl(callUrl);
 
-  console.log(`RSP: ${response}`);*/
+  console.log(`RSP: ${response}`);
 
 
+  // @ts-ignore
+  let tokenIdName = "max";
 
   // 2. Create 6551 name
   // /register/:chainId/:tokenContract/:tokenId/:name/:signature 
-  /*let registerMsg = `Registering your catId ${tokenId} name to ${tokenIdName}.${tokenName}`;
+  //Registering your tokenId 5 name to max.bob.xnft.eth
+  let registerMsg = `Registering your tokenId ${tokenId} name to ${tokenIdName}.${tokenName}`;
   const signature2 = await wallet.signMessage(registerMsg);
   console.log('Signature: ', signature2);
-  let callUrl2 = `http://10.191.8.133:8083/register/${chainId}/${catsTokenAddr}/${tokenId}/${tokenIdName}.${tokenName}/${signature2}`;
+  let callUrl2 = `${registryAddress}/register/${chainId}/${tokenIdName}.${tokenName}/${tokenId}/${signature2}`;
   console.log(`CALL: ${callUrl2}`);
   const response2 = await postUrl(callUrl2);
 
-  console.log(`RSP: ${response2}`);*/
-  // 3. resolve name
-  // 4. Resolve image
-  // 5. Storage
+  console.log(`RSP: ${response2}`);
 
-  //now resolve
+  /*
+  //Set storeage
+  const formdata = new FormData();
+  formdata.append("jipslo.jpg", fileInput.files[0], "/path/to/file");
+
+  const requestOptions = {
+    method: "POST",
+    body: formdata,
+    redirect: "follow"
+  };
+
+  fetch(`${registryAddress}/registercontent/11155111/${tokenIdName}.${tokenName}`, requestOptions)
+    .then((response) => response.text())
+    .then((result) => console.log(result))
+    .catch((error) => console.error(error));
+  */
+
+  //first try setting text of existing upload
+  let ipfsHash = "QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g";
+  let registerMsg3 = `Attempting to update storage to domain ${tokenIdName}.${tokenName} on ${chainId} with hash ${ipfsHash}`;
+  //Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g
+  console.log(`${registerMsg3}`);
+  console.log("Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g");
+
+  const signature3 = await wallet.signMessage(registerMsg3);
+  console.log('Signature: ', signature3);
+  let callUrl3 = `${registryAddress}/registercontent/${chainId}/${tokenIdName}.${tokenName}/${signature3}/${ipfsHash}`;
+  console.log(`CALL: ${callUrl3}`);
+  const response3 = await postUrl(callUrl3);
+  console.log(`IPFS Set: ${response3}`);
+
+  let key = "Twitter";
+  let text = "@frodo";
+
+  var registerMsg4 = `Attempting to update ${tokenIdName}.${tokenName} ${key} to value ${text} on ${chainId}`;
+  //Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g
+  console.log(`${registerMsg4}`);
+  //console.log("Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g");
+
+  const signature4 = await wallet.signMessage(registerMsg4);
+  console.log('Signature: ', signature4);
+  let callUrl4 = `${registryAddress}/registertext/${chainId}/${tokenIdName}.${tokenName}/${key}/${text}/${signature4}`;
+  console.log(`CALL: ${callUrl4}`);
+  const response4 = await postUrl(callUrl4);
+  console.log(`IPFS Set: ${response4}`);
+
+  //now resolve Avatar
   let resolver = await provider.getResolver(`${tokenIdName}.${tokenName}`);
 
-  //ethMainnetAddress = await resolver!!.getAddress();
+  //console.log(`Resolver: ${JSON.stringify(resolver)}`);
 
-  //console.log(`ADDR: ${ethMainnetAddress}`);
+  let ethMainnetAddress = await resolver!!.getAddress();
+
+  console.log(`ADDR: ${ethMainnetAddress}`);
 
   //resolve image
   let avatarUrl = await resolver!!.getAvatar();
+  console.log(`AVATAR: ${avatarUrl} ${JSON.stringify(avatarUrl)}`);
 
-  console.log(`AVATAR: ${JSON.stringify(avatarUrl)}`);
+  //read contenthash text
+  let contextHashText = await resolver!!.getContentHash();
+  console.log(`CONTENT: ${contextHashText}`);
+
+  let twitterText = await resolver!!.getText(key);
+  console.log(`${key}: ${twitterText}`);
 
 
+
+
+  //let avatarURL2 = await resolveAvatar(`${tokenIdName}.${tokenName}`, resolver!!.address);
+  //console.log(`AVATAR2: ${avatarURL2}`);
+
+  /*let key = "avatar";
+
+  //const avatar = await getText("avatar");
+  let keyBytes = toUtf8Bytes(key);
+  // The nodehash consumes the first slot, so the string pointer targets
+  // offset 64, with the length at offset 64 and data starting at offset 96
+  keyBytes = concat([ bytes32ify(64), bytes32ify(keyBytes.length), keyBytes ]);
+  
+  // Pad to word-size (32 bytes)
+  if ((keyBytes.length % 32) !== 0) {
+    keyBytes = concat([ keyBytes, hexZeroPad("0x", 32 - (key.length % 32)) ])
+  }
+
+  const funcEncode = "0x59d1d43c" + hexlify(keyBytes);
+  //await this._fetchBytes("0x59d1d43c", hexlify(keyBytes));
+
+
+*/
+  
+
+  //console.log(`AVATAR: ${JSON.stringify(avatarUrl)}`);
+
+  //let addr = await resolve(`${tokenIdName}.${tokenName}`, resolver!!.address);
+  //console.log(`ADDR: ${addr}`);
 
 
   // @ts-ignore
@@ -227,7 +317,7 @@ async function postUrl(url: string): Promise<string> {
 
           //now call proof
           const proofReturn = await catResolver.resolveWithProof(proofResponse, extraData);
-          console.log(proofReturn);
+          console.log(`Proof Return: ${proofReturn}`);
 
           console.log("Len: " + proofReturn.length);
           var truncated = proofReturn;
@@ -247,6 +337,89 @@ async function postUrl(url: string): Promise<string> {
     return ethers.constants.AddressZero;
   }
 
+
+  // @ts-ignore
+  async function resolveAvatar(name: string, resolverAddress: string): Promise<string> {
+    //const namehash = ethers.utils.namehash(name);
+    const dnsEncode = ethers.utils.dnsEncode(name);
+    //const funcEncode = "0x3b3b57de" + namehash.substring(2);
+    let key = "avatar";
+
+  //const avatar = await getText("avatar");
+  let keyBytes: any = toUtf8Bytes(key);
+  // The nodehash consumes the first slot, so the string pointer targets
+  // offset 64, with the length at offset 64 and data starting at offset 96
+  keyBytes = concat([ bytes32ify(64), bytes32ify(keyBytes.length), keyBytes ]);
+
+  console.log(`Key: ${keyBytes}`);
+  
+  // Pad to word-size (32 bytes)
+  if ((keyBytes.length % 32) !== 0) {
+    keyBytes = concat([ keyBytes, hexZeroPad("0x", 32 - (key.length % 32)) ])
+  }
+
+  //const funcEncode = "0x59d1d43c" + hexlify(keyBytes);
+
+  //const hexStuff = hexlify(keyBytes);
+  //const hexStuff2 = `0x59d1d43c${hexStuff.substring(2)}`;
+  const hexStuff2 = `0x59d1d43c1902719f7622c32aa80f59d72a08c308a18172b858ba651607c149ce04cb0190000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000066176617461720000000000000000000000000000000000000000000000000000`;
+
+  console.log(`Hex Stuff: ${hexStuff2}`);
+
+  const funcEncode = hexStuff2;
+
+    const catResolver = new ethers.Contract(resolverAddress, [
+      'function resolve(bytes name, bytes data) view returns (bytes)',
+      'function resolveWithProof(bytes calldata response, bytes calldata extraData) external view returns(bytes memory)'
+    ], provider);
+
+    //call, get error
+    try {
+      const resolverTx = await catResolver.resolve(dnsEncode, funcEncode);
+      console.log(resolverTx);
+    } catch (error) {
+      //break down the data
+      const iface = new ethers.utils.Interface(returnAbi);
+      const decoded = iface.decodeFunctionData('OffchainLookup', error.data);
+      
+
+      //format URL:
+      const callUrl = decoded.urls[0].replace('{sender}', decoded.sender).replace('{data}', decoded.callData);
+      console.log(callUrl);
+
+      try {
+        const response = await fetch(callUrl);
+
+        console.log(response);
+
+        if (response.ok) {
+          const data = await response.json();
+
+          //response1
+          const proofResponse = data.data;
+          const extraData = decoded.extraData;
+
+          //now call proof
+          const proofReturn = await catResolver.resolveWithProof(proofResponse, extraData);
+          console.log("" + proofReturn);
+
+          console.log("Len: " + proofReturn.length);
+          var truncated = proofReturn;
+          if (proofReturn.length > 42) {
+            truncated = "0x" + proofReturn.substring(proofReturn.length - 40);
+          }
+
+          console.log("Truncated: " + truncated);
+
+          return ethers.utils.getAddress(truncated);
+        }
+      } catch (callError) {
+        // nop, expected
+      }
+    }
+
+    return ethers.constants.AddressZero;
+  }
 
 }
 

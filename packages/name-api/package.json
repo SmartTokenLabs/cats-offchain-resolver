@@ -22,13 +22,16 @@
   "homepage": "https://github.com/nicktaras/fastify-better-sqllite-server#readme",
   "dependencies": {
     "@fastify/cors": "^8.5.0",
+    "@fastify/multipart": "^8.2.0",
     "@tokenbound/sdk": "^0.4.5",
     "@types/better-sqlite3": "^7.6.8",
     "better-sqlite3": "^9.2.2",
+    "bs58": "^5.0.0",
     "dotenv": "^16.3.1",
     "ethers": "^6.9.2",
     "fastify": "4.10.2",
     "fetch": "^1.1.0",
+    "form-data": "^4.0.0",
     "json": "^11.0.0",
     "typescript": "^5.3.3",
     "viem": "^1.19.11"

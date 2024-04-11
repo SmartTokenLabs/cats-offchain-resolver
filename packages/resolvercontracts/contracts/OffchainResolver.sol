@@ -59,7 +59,7 @@ contract OffchainResolver is IExtendedResolver, SupportsInterface, Ownable {
      * @return The return data, ABI encoded identically to the underlying function.
      */
     function resolve(bytes calldata name, bytes calldata data) external override view returns(bytes memory) {
-        bytes memory callData = abi.encodeWithSelector(IResolverService.resolve.selector, name, data);
+        bytes memory callData = abi.encodeWithSelector(IResolverService.resolve.selector, name, data, block.chainid);
         string[] memory urls = new string[](1);
         urls[0] = url;
         revert OffchainLookup(

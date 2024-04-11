@@ -1,23 +1,25 @@
 import { ZeroAddress, ethers } from 'ethers';
+import bs58 from 'bs58';
 
 // @ts-ignore
-import { INFURA_KEY } from "./constants";
+import { INFURA_KEY, NAME_LIMIT } from "./constants";
 
 const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
 
 type ChainDetail = {
     name: string;
     RPCurl: string;
+    chainId: number;
 };
 
 const CHAIN_DETAILS: Record<number, ChainDetail> = {
-    1: { name: "mainnet", RPCurl: `https://mainnet.infura.io/v3/${INFURA_KEY}` },
-    5: { name: "goerli", RPCurl: `https://goerli.infura.io/v3/${INFURA_KEY}` },
-    11155111: { name: "sepolia", RPCurl: `https://sepolia.infura.io/v3/${INFURA_KEY}` },
-    42161: { name: "arbitrum-mainnet", RPCurl: `https://arbitrum-mainnet.infura.io/v3/${INFURA_KEY}` },
-    80001: { name: "polygon-mumbai", RPCurl: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}` },
-    137: { name: "polygon-mainnet", RPCurl: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}` },
-    10: { name: "optimism-mainnet", RPCurl: `https://optimism-mainnet.infura.io/v3/${INFURA_KEY}` }
+    1: { name: "mainnet", RPCurl: `https://mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 1 },
+    5: { name: "goerli", RPCurl: `https://goerli.infura.io/v3/${INFURA_KEY}`, chainId: 5 },
+    11155111: { name: "sepolia", RPCurl: `https://sepolia.infura.io/v3/${INFURA_KEY}`, chainId: 11155111 },
+    42161: { name: "arbitrum-mainnet", RPCurl: `https://arbitrum-mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 42161 },
+    80001: { name: "polygon-mumbai", RPCurl: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`, chainId: 80001 },
+    137: { name: "polygon-mainnet", RPCurl: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 137 },
+    10: { name: "optimism-mainnet", RPCurl: `https://optimism-mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 10 },
 };
 
 // Domains owned by STL, subdomains can be used freely
@@ -29,11 +31,11 @@ const STL_DOMAINS: Record<string, number[]> = {
 export function getProvider(useChainId: number): ethers.JsonRpcProvider | null {
     const chainDetails: ChainDetail = CHAIN_DETAILS[useChainId];
 
-    //console.log(`CHAIN ${chainDetails.RPCurl} ${chainDetails.name} ${useChainId}`);
+    //console.log(`CHAIN ${chainDetails.RPCurl} ${chainDetails.name} ${chainDetails.chainId}`);
 
     if (chainDetails !== null) {
         return new ethers.JsonRpcProvider(chainDetails.RPCurl, {
-            chainId: useChainId,
+            chainId: chainDetails.chainId,
             name: chainDetails.name,
             ensAddress: ENS_REGISTRY,
         });
@@ -172,11 +174,20 @@ async function resolve(name: string, offchainResolverAddress: string, chainId: n
       //console.log(`ERROR: ${JSON.stringify(error)}`);
       // @ts-ignore
       const iface = new ethers.Interface(returnAbi);
-      // @ts-ignore
-      const decoded = iface.decodeFunctionData('OffchainLookup', error.data);
 
-      //format URL:
-      const callUrl = decoded.urls[0].replace('{sender}', decoded.sender).replace('{data}', decoded.callData);
+      var callUrl = null;
+      var decoded = null;
+
+      try {
+        // @ts-ignore
+        decoded = iface.decodeFunctionData('OffchainLookup', error.data);
+
+        //format URL:
+        callUrl = decoded.urls[0].replace('{sender}', decoded.sender).replace('{data}', decoded.callData);
+      } catch (error: any) {
+        console.log(`ERRORR: ${JSON.stringify(error)}`);
+        return ethers.ZeroAddress;
+      }
 
       //console.log(`${callUrl}`);
 
@@ -273,3 +284,34 @@ export async function userOwnsDomain(baseName: string, domainName: string, apply
     let firstIndex = name.indexOf('.');
     return name.slice(firstIndex+1);
   }
+
+  export function getPrimaryName(name: string): string {
+    const thisName = name.split('.')[0];
+    const santisedName = thisName.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
+    const truncatedName = santisedName.slice(0, NAME_LIMIT);
+
+    return truncatedName
+  }
+
+  export function ipfsHashToHex2(ipfsHash: string): string {
+    // Decode Base58 string to a buffer
+    const buffer = bs58.decode(ipfsHash);
+
+    // Convert the buffer to a hex string
+    const hex = Buffer.from(buffer).toString('hex');
+
+    return hex;
+}
+
+export function ipfsHashToHex(ipfsHash: string): string {
+    // Decode the IPFS hash from Base58 to a buffer
+    const buffer = bs58.decode(ipfsHash);
+  
+    // Convert the buffer (Uint8Array) to a hex string
+    const hex = Buffer.from(buffer).toString('hex');
+  
+    // Assuming CIDv1 with dag-pb (0x70) and SHA-256 (0x12) multihash
+    const prefixedHex = `e3010170${hex}`;
+  
+    return `0x${prefixedHex}`;
+}
