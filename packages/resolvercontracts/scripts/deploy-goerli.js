@@ -65,7 +65,7 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
     console.log(`NAMEHASH: ${xnftNode}`);
 
     //update URL
-    let updateUrl = await customResolver.connect(goerliKey).updateUrl(pcTestUri);
+    let updateUrl = await customResolver.connect(goerliKey).updateUrl(localTestUri);
     await updateUrl.wait();
 
     //set resolver
@@ -99,7 +99,7 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
 
     
 
-    let ensOwner = await registry.connect(goerliKey).owner(smartcatNode);
+    /*let ensOwner = await registry.connect(goerliKey).owner(smartcatNode);
     console.log("Owner: " + ensOwner);
 
     let resolverAddr = await registry.connect(goerliKey).resolver(smartcatNode);
@@ -117,14 +117,14 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
     console.log("Owner: " + ensOwner);
 
     resolverAddr = await registry.connect(goerliKey).resolver(thesmartcatsNode);
-    console.log("Resolver: " + resolverAddr);
+    console.log("Resolver: " + resolverAddr);*/
 
     //set resolver
     //let updateResolverTx = await registry.connect(goerliKey).setResolver(smartcatNode, localResolverAddr);
     //await updateResolverTx.wait();
 
-    resolverAddr = await registry.connect(goerliKey).resolver(smartcatNode);
+    resolverAddr = await registry.connect(goerliKey).resolver(xnftNode);
     console.log("Resolver: " + resolverAddr);
 
 })();
-// npx hardhat run scripts/deploy-goerli.js --network goerli
+// npx hardhat run scripts/deploy-goerli.js --network sepolia

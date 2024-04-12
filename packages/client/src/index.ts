@@ -135,7 +135,8 @@ async function postUrl(url: string): Promise<string> {
   // @ts-ignore
   const wallet = new ethers.Wallet(pk);
 
-  let gatewayServer = "http://192.168.50.206";
+  //let gatewayServer = "http://192.168.50.206";
+  let gatewayServer = "http://44.217.178.162";
   // @ts-ignore
   let gatewayAddress = `${gatewayServer}:8080`;
   // @ts-ignore

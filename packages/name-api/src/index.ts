@@ -2,17 +2,10 @@
 import fastify from "fastify";
 import multipart from '@fastify/multipart';
 import { ethers, ZeroAddress } from "ethers";
-import { SQLiteDatabase, BaseNameDef } from "./sqlite";
+import { SQLiteDatabase } from "./sqlite";
 import fs from 'fs';
-import path from 'path';
 import { tokenAvatarRequest, isIPFS } from "./tokenDiscovery";
 import fetch, {
-  Blob,
-  blobFrom,
-  blobFromSync,
-  File,
-  fileFrom,
-  fileFromSync,
   Headers,
   Request,
   Response,
@@ -34,17 +27,17 @@ if (!globalThis.fetch) {
 import { PATH_TO_CERT, SQLite_DB_FILE, INFURA_IPFS_ID, INFURA_IPFS_SECRET, NAME_LIMIT, RESOLVER_TIMEOUT_SECS } from "./constants";
 
 import cors from '@fastify/cors';
-import { getTokenBoundAccount, getTokenBoundNFT } from "./tokenBound";
-import { resolveEnsName, userOwnsDomain, getProvider, getBaseName, ipfsHashToHex, contentHashToIpfsHash } from "./resolve";
+import { getTokenBoundAccount } from "./tokenBound";
+import { resolveEnsName, userOwnsDomain, getProvider, getBaseName, ipfsHashToHex } from "./resolve";
 
 const db: SQLiteDatabase = new SQLiteDatabase(
-  SQLite_DB_FILE, // e.g. 'ensnames.db'
+  SQLite_DB_FILE as string, // e.g. 'ensnames.db'
 );
 
 console.log(`Path to Cert: ${PATH_TO_CERT}`);
 const ipfsAuth = 'Basic ' + Buffer.from(INFURA_IPFS_ID + ':' + INFURA_IPFS_SECRET).toString('base64');
 
-var app;
+var app: any;
 var lastError: string[] = [];
 var coinTypeRoute: string[] = [];
 
@@ -74,7 +67,6 @@ let resolverChecks = new Map<string, ResolverCheck>();
 
 const cacheTimeout = 30 * 1000; // 30 second cache validity
 const logDumpLimit = 2000; //allow 2000 logs to be dumped
-const resolverCheckLimit = 10; //only keep 10 checks in memory
 
 if (PATH_TO_CERT) {
   app = fastify({
@@ -91,21 +83,21 @@ if (PATH_TO_CERT) {
   });
 }
 
-await app.register(cors, {
-  origin: true
-});
+// await app.register(cors, {
+//   origin: true
+// });
 
-await app.register(multipart, {
-  limits: {
-    fieldNameSize: 100, // Max field name size in bytes
-    fieldSize: 100,     // Max field value size in bytes
-    fields: 10,         // Max number of non-file fields
-    fileSize: 1000000,  // For multipart forms, the max file size in bytes
-    files: 1,           // Max number of file fields
-    headerPairs: 2000,  // Max number of header key=>value pairs
-    parts: 1000         // For multipart forms, the max number of parts (fields + files)
-  }
-});
+// await app.register(multipart, {
+//   limits: {
+//     fieldNameSize: 100, // Max field name size in bytes
+//     fieldSize: 100,     // Max field value size in bytes
+//     fields: 10,         // Max number of non-file fields
+//     fileSize: 1000000,  // For multipart forms, the max file size in bytes
+//     files: 1,           // Max number of file fields
+//     headerPairs: 2000,  // Max number of header key=>value pairs
+//     parts: 1000         // For multipart forms, the max number of parts (fields + files)
+//   }
+// });
 
 //1. Register token:
 // /registerToken/:chainId/:tokenContract/:name/:signature/:ensChainId? Signature is `Attempting to register domain ${name} name to ${tokenContract}`
@@ -127,7 +119,7 @@ async function getTokenImage(chainId: number, name: string, tokenId: number) {
   }
 }
 
-app.get('/text/:name/:key/:chainId', async (request, reply) => {
+app.get('/text/:name/:key/:chainId', async (request: any, reply: any) => {
   const { name, key, chainId } = request.params;
 
   console.log(`${key} ${name} ${chainId}`);
@@ -829,7 +821,40 @@ async function uploadFileToIPFS(filePath: string): Promise<string> {
   return "";
 }
 
-const start = async () => {
+async function main() {
+  try {
+    await app.listen({ port: 8083, host: '0.0.0.0' });
+    console.log(`Server is listening on ${app.server?.address()} ${app.server?.address().port}`);
+
+    db.initDb();
+    setInterval(checkCacheEntries, cacheTimeout * 2);
+    testResolve();
+    testMetaData();
+
+    await app.register(cors, {
+      origin: true
+    });
+    
+    await app.register(multipart, {
+      limits: {
+        fieldNameSize: 100, // Max field name size in bytes
+        fieldSize: 100,     // Max field value size in bytes
+        fields: 10,         // Max number of non-file fields
+        fileSize: 1000000,  // For multipart forms, the max file size in bytes
+        files: 1,           // Max number of file fields
+        headerPairs: 2000,  // Max number of header key=>value pairs
+        parts: 1000         // For multipart forms, the max number of parts (fields + files)
+      }
+    });
+
+  } catch (err) {
+    console.log(err);
+    app.log.error(err);
+    process.exit(1);
+  }
+}
+
+/*const start = async () => {
 
   try {
     await app.listen({ port: 8083, host: '0.0.0.0' });
@@ -846,4 +871,5 @@ const start = async () => {
   }
 };
 
-start();
+start();*/
+main().catch(console.error);

@@ -35,21 +35,21 @@ export class SQLiteDatabase {
   constructor(dbName: string) {
     this.db = new BetterSqlite3(dbName, { verbose: console.log });
 
-    this.db.exec(`
-      DROP TABLE names;
+    /*this.db.exec(`
+      DROP TABLE IF EXISTS names;
     `)
 
     this.db.exec(`
-      DROP TABLE tokens;
+      DROP TABLE IF EXISTS tokens;
     `)
 
     this.db.exec(`
-      DROP TABLE address_overrides;
+      DROP TABLE IF EXISTS address_overrides;
     `)
 
     this.db.exec(`
-      DROP TABLE text_entries;
-    `)
+      DROP TABLE IF_EXISTS text_entries;
+    `)*/
     
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS names (

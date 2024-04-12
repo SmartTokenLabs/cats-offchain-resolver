@@ -169,7 +169,7 @@ async function resolve(name: string, offchainResolverAddress: string, chainId: n
     try {
       const resolverTx = await catResolver.resolve(dnsEncode, funcEncode);
       console.log(resolverTx);
-    } catch (error: any) {
+    } catch (error) {
       //break down the data
       //console.log(`ERROR: ${JSON.stringify(error)}`);
       // @ts-ignore
@@ -183,8 +183,9 @@ async function resolve(name: string, offchainResolverAddress: string, chainId: n
         decoded = iface.decodeFunctionData('OffchainLookup', error.data);
 
         //format URL:
+        // @ts-ignore
         callUrl = decoded.urls[0].replace('{sender}', decoded.sender).replace('{data}', decoded.callData);
-      } catch (error: any) {
+      } catch (error) {
         console.log(`ERRORR: ${JSON.stringify(error)}`);
         return ethers.ZeroAddress;
       }
@@ -199,6 +200,7 @@ async function resolve(name: string, offchainResolverAddress: string, chainId: n
 
           //response1
           const proofResponse = data.data;
+          // @ts-ignore
           const extraData = decoded.extraData;
 
           //now call proof

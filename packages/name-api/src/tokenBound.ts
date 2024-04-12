@@ -17,7 +17,7 @@ function addressToUint8Array(address: string): Uint8Array {
 	return array;
 }
 
-function computeTokenBound(chainId: number, tokenContract: string, tokenId: number, salt: number) {
+function computeTokenBound(chainId: number, tokenContract: string, tokenId: number, salt: number): string {
 
 	const constructorArgs = ethers.AbiCoder.defaultAbiCoder().encode(
 		["uint256", "uint256", "address", "uint256"],
@@ -41,11 +41,11 @@ function computeTokenBound(chainId: number, tokenContract: string, tokenId: numb
 	return create2Address;
 }
 
-function hexToNumber(hexString: string): number {
+/*function hexToNumber(hexString: string): number {
 	return parseInt(hexString, 16);
-}
+}*/
 
-export function getTokenBoundAccount(chainId: number, tokenContract: `0x${string}`, tokenId: `0x${string}`) {
+export function getTokenBoundAccount(chainId: number, tokenContract: string, tokenId: number): string {
 
-	return computeTokenBound(chainId, tokenContract, hexToNumber(tokenId), 0);
+	return computeTokenBound(chainId, tokenContract, tokenId, 0);
 }
