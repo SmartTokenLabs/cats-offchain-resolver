@@ -35,7 +35,7 @@ export class SQLiteDatabase {
   constructor(dbName: string) {
     this.db = new BetterSqlite3(dbName, { verbose: console.log });
 
-    this.db.exec(`
+    /*this.db.exec(`
       DROP TABLE names;
     `)
 
@@ -49,7 +49,7 @@ export class SQLiteDatabase {
 
     this.db.exec(`
       DROP TABLE text_entries;
-    `)
+    `)*/
     
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS names (
@@ -175,10 +175,10 @@ export class SQLiteDatabase {
     }
   }
 
-  getAccountCount(): string {
+  getAccountCount() {
     const count = this.db.prepare('SELECT COUNT(*) as count FROM names').get();
     // @ts-ignore
-    return <string>count.count;
+    return count.count as number;
   }
 
   getBaseNameIndex(chainId: number, tokenContract: string): number {
