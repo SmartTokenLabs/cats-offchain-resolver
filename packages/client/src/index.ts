@@ -153,7 +153,7 @@ async function postUrl(url: string): Promise<string> {
   let tokenId = 5;
   let tokenName = name;
 
-  const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
+  /*const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
 
   console.log(`MSG: ${message}`);
 
@@ -166,27 +166,29 @@ async function postUrl(url: string): Promise<string> {
 
   const response = await postUrl(callUrl);
 
-  console.log(`RSP: ${response}`);
+  console.log(`RSP: ${response}`);*/
 
 
   // @ts-ignore
   let tokenIdName = "max";
+  let key = "Twitter";
+  // @ts-ignore
+  let text = "@frodo";
 
   // 2. Create 6551 name
   // /register/:chainId/:tokenContract/:tokenId/:name/:signature 
   //Registering your tokenId 5 name to max.bob.xnft.eth
-  let registerMsg = `Registering your tokenId ${tokenId} name to ${tokenIdName}.${tokenName}`;
+  /*let registerMsg = `Registering your tokenId ${tokenId} name to ${tokenIdName}.${tokenName}`;
   const signature2 = await wallet.signMessage(registerMsg);
   console.log('Signature: ', signature2);
   let callUrl2 = `${registryAddress}/register/${chainId}/${tokenIdName}.${tokenName}/${tokenId}/${signature2}`;
   console.log(`CALL: ${callUrl2}`);
   const response2 = await postUrl(callUrl2);
 
-  console.log(`RSP: ${response2}`);
+  console.log(`RSP: ${response2}`);*/
 
-  /*
   //Set storeage
-  const formdata = new FormData();
+  /*const formdata = new FormData();
   formdata.append("jipslo.jpg", fileInput.files[0], "/path/to/file");
 
   const requestOptions = {
@@ -198,11 +200,11 @@ async function postUrl(url: string): Promise<string> {
   fetch(`${registryAddress}/registercontent/11155111/${tokenIdName}.${tokenName}`, requestOptions)
     .then((response) => response.text())
     .then((result) => console.log(result))
-    .catch((error) => console.error(error));
-  */
+    .catch((error) => console.error(error));*/
+  
 
   //first try setting text of existing upload
-  let ipfsHash = "QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g";
+  /*let ipfsHash = "QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g";
   let registerMsg3 = `Attempting to update storage to domain ${tokenIdName}.${tokenName} on ${chainId} with hash ${ipfsHash}`;
   //Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g
   console.log(`${registerMsg3}`);
@@ -215,8 +217,7 @@ async function postUrl(url: string): Promise<string> {
   const response3 = await postUrl(callUrl3);
   console.log(`IPFS Set: ${response3}`);
 
-  let key = "Twitter";
-  let text = "@frodo";
+
 
   var registerMsg4 = `Attempting to update ${tokenIdName}.${tokenName} ${key} to value ${text} on ${chainId}`;
   //Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g
@@ -228,7 +229,15 @@ async function postUrl(url: string): Promise<string> {
   let callUrl4 = `${registryAddress}/registertext/${chainId}/${tokenIdName}.${tokenName}/${key}/${text}/${signature4}`;
   console.log(`CALL: ${callUrl4}`);
   const response4 = await postUrl(callUrl4);
-  console.log(`IPFS Set: ${response4}`);
+  console.log(`IPFS Set: ${response4}`);*/
+
+  let resolver2 = await provider.getResolver(`${tokenName}`);
+
+  console.log(`Resolver: ${JSON.stringify(resolver2)}`);
+
+  let ethMainnetAddress2 = await resolver2!!.getAddress();
+
+  console.log(`ADDR2: ${ethMainnetAddress2}`);
 
   //now resolve Avatar
   let resolver = await provider.getResolver(`${tokenIdName}.${tokenName}`);

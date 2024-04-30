@@ -83,21 +83,21 @@ if (PATH_TO_CERT) {
   });
 }
 
-// await app.register(cors, {
-//   origin: true
-// });
+await app.register(cors, {
+  origin: true
+});
 
-// await app.register(multipart, {
-//   limits: {
-//     fieldNameSize: 100, // Max field name size in bytes
-//     fieldSize: 100,     // Max field value size in bytes
-//     fields: 10,         // Max number of non-file fields
-//     fileSize: 1000000,  // For multipart forms, the max file size in bytes
-//     files: 1,           // Max number of file fields
-//     headerPairs: 2000,  // Max number of header key=>value pairs
-//     parts: 1000         // For multipart forms, the max number of parts (fields + files)
-//   }
-// });
+await app.register(multipart, {
+  limits: {
+    fieldNameSize: 100, // Max field name size in bytes
+    fieldSize: 100,     // Max field value size in bytes
+    fields: 10,         // Max number of non-file fields
+    fileSize: 1000000,  // For multipart forms, the max file size in bytes
+    files: 1,           // Max number of file fields
+    headerPairs: 2000,  // Max number of header key=>value pairs
+    parts: 1000         // For multipart forms, the max number of parts (fields + files)
+  }
+});
 
 //1. Register token:
 // /registerToken/:chainId/:tokenContract/:name/:signature/:ensChainId? Signature is `Attempting to register domain ${name} name to ${tokenContract}`
@@ -821,46 +821,54 @@ async function uploadFileToIPFS(filePath: string): Promise<string> {
   return "";
 }
 
-async function main() {
-  try {
-    await app.listen({ port: 8083, host: '0.0.0.0' });
-    console.log(`Server is listening on ${app.server?.address()} ${app.server?.address().port}`);
-
-    db.initDb();
-    setInterval(checkCacheEntries, cacheTimeout * 2);
-    testResolve();
-    testMetaData();
-
-    await app.register(cors, {
-      origin: true
-    });
-    
-    await app.register(multipart, {
-      limits: {
-        fieldNameSize: 100, // Max field name size in bytes
-        fieldSize: 100,     // Max field value size in bytes
-        fields: 10,         // Max number of non-file fields
-        fileSize: 1000000,  // For multipart forms, the max file size in bytes
-        files: 1,           // Max number of file fields
-        headerPairs: 2000,  // Max number of header key=>value pairs
-        parts: 1000         // For multipart forms, the max number of parts (fields + files)
-      }
-    });
-
-  } catch (err) {
-    console.log(err);
-    app.log.error(err);
-    process.exit(1);
-  }
+function dumpDb() {
+  const dump = db.getTableDump();
+  fs.writeFileSync('./dump.csv', dump);
 }
 
-/*const start = async () => {
+// async function main() {
+//   try {
+//     await app.listen({ port: 8083, host: '0.0.0.0' });
+//     console.log(`Server is listening on ${app.server?.address()} ${app.server?.address().port}`);
+
+//     db.initDb();
+//     dumpDb();
+//     setInterval(checkCacheEntries, cacheTimeout * 2);
+//     testResolve();
+//     testMetaData();
+
+
+//     await app.register(cors, {
+//       origin: true
+//     });
+    
+//     await app.register(multipart, {
+//       limits: {
+//         fieldNameSize: 100, // Max field name size in bytes
+//         fieldSize: 100,     // Max field value size in bytes
+//         fields: 10,         // Max number of non-file fields
+//         fileSize: 1000000,  // For multipart forms, the max file size in bytes
+//         files: 1,           // Max number of file fields
+//         headerPairs: 2000,  // Max number of header key=>value pairs
+//         parts: 1000         // For multipart forms, the max number of parts (fields + files)
+//       }
+//     });
+
+//   } catch (err) {
+//     console.log(err);
+//     app.log.error(err);
+//     process.exit(1);
+//   }
+// }
+
+const start = async () => {
 
   try {
     await app.listen({ port: 8083, host: '0.0.0.0' });
     console.log(`Server is listening on ${app.server?.address()} ${app.server?.address().port}`);
 
     db.initDb();
+    dumpDb();
     setInterval(checkCacheEntries, cacheTimeout * 2);
     testResolve();
     testMetaData();
@@ -871,5 +879,5 @@ async function main() {
   }
 };
 
-start();*/
-main().catch(console.error);
+start();
+//main().catch(console.error);

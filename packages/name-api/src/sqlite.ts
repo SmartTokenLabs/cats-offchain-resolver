@@ -115,6 +115,8 @@ export class SQLiteDatabase {
     const columnNotExists = !columnInfo.some(column => column.name === 'id');
     // @ts-ignore
     const textExists = columnInfo.some(column => column.name === 'text');
+    // @ts-ignore
+    const tokensIndexExists = columnInfo.some(column => column.name === 'tokens_index');
 
     if (!columnExists) {
       console.log("Updating to add tokenId");
@@ -142,11 +144,6 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
 
-    this.db.prepare(`
-      INSERT INTO names_temp (name, contenthash, token_id, tokens_index, createdAt)
-      SELECT name, contenthash, token_id, COALESCE(tokens_index, ?) AS tokens_index, createdAt FROM names
-    `).run(smartcatsIndex);
-
       this.db.exec(`
             DROP TABLE names;
         `);
@@ -154,6 +151,21 @@ export class SQLiteDatabase {
       this.db.exec(`
             ALTER TABLE names_temp RENAME TO names;
         `);
+    }
+
+    //now update the tokens_index column
+    if (!tokensIndexExists) {
+      console.log("Updating to add tokens_index");
+      this.db.prepare(`
+        INSERT INTO names (name, contenthash, token_id, tokens_index, createdAt)
+        SELECT 
+            name, 
+            contenthash, 
+            token_id, 
+            COALESCE(tokens_index, ?) AS tokens_index, 
+            createdAt 
+        FROM names
+      `).run(smartcatsIndex);
     }
 
     this.setupENSIP9Reverse();
@@ -166,6 +178,14 @@ export class SQLiteDatabase {
     `;
     this.db.exec(sql);
     console.log("Domain names stripped.");
+
+  }
+
+  getTableDump(): string {
+    const csv = this.db.prepare('SELECT * FROM names ORDER BY name').all();
+    // @ts-ignore
+    const csvString = csv.map(row => `${row.name},${row.token_id},${row.tokens_index}`).join('\n');
+    return csvString;
   }
 
   setupENSIP9Reverse() {
