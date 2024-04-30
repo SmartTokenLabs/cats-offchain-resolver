@@ -9,7 +9,7 @@ const EMPTY_CONTENT_HASH = '0x';
 
 const SMARTCAT_ETH = "thesmartcats.eth";
 const SMARTCAT_TOKEN = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
-const SMARTCAT_TOKEN_OWNER = "0x9c4171b69E5659647556E81007EF941f9B042b1a";
+const SMARTCAT_TOKEN_OWNER = "0x9c4171b69E5659647556E81007EF941f9B042b1a";  
 
 const ENSIP9: Record<number, number> = {
   60: 1,
@@ -34,22 +34,6 @@ export class SQLiteDatabase {
 
   constructor(dbName: string) {
     this.db = new BetterSqlite3(dbName, { verbose: console.log });
-
-    /*this.db.exec(`
-      DROP TABLE IF EXISTS names;
-    `)
-
-    this.db.exec(`
-      DROP TABLE IF EXISTS tokens;
-    `)
-
-    this.db.exec(`
-      DROP TABLE IF EXISTS address_overrides;
-    `)
-
-    this.db.exec(`
-      DROP TABLE IF_EXISTS text_entries;
-    `)*/
     
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS names (
@@ -175,10 +159,10 @@ export class SQLiteDatabase {
     }
   }
 
-  getAccountCount(): string {
+  getAccountCount() {
     const count = this.db.prepare('SELECT COUNT(*) as count FROM names').get();
     // @ts-ignore
-    return <string>count.count;
+    return count.count as number;
   }
 
   getBaseNameIndex(chainId: number, tokenContract: string): number {
