@@ -1,14 +1,13 @@
 import BetterSqlite3 from 'better-sqlite3';
-import dotenv from 'dotenv';
 import { getBaseName, getPrimaryName } from "./resolve";
 import { getTokenBoundAccount } from "./tokenBound";
-dotenv.config();
+import { RELEASE_MODE } from "./constants";
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const EMPTY_CONTENT_HASH = '0x';
 
-const SMARTCAT_ETH = "thesmartcats.eth";
-const SMARTCAT_TOKEN = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
+export const SMARTCAT_ETH = "thesmartcats.eth";
+export const SMARTCAT_TOKEN = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
 const SMARTCAT_TOKEN_OWNER = "0x9c4171b69E5659647556E81007EF941f9B042b1a";
 
 const ENSIP9: Record<number, number> = {
@@ -28,12 +27,20 @@ export interface BaseNameDef {
   tokenContract: string
 }
 
+let releaseMode = true;
+
+function customLogger(query: any) {
+  if (!releaseMode) {
+      console.log(query);
+  }
+}
+
 export class SQLiteDatabase {
 
   db: BetterSqlite3.Database;
 
   constructor(dbName: string) {
-    this.db = new BetterSqlite3(dbName, { verbose: console.log });
+    this.db = new BetterSqlite3(dbName, { verbose: customLogger });
 
     /*this.db.exec(`
       DROP TABLE IF EXISTS names;
@@ -72,11 +79,11 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
     `);
 
-    // this table is for if you want to set a specific ENS address for a given token
+    // this table is for if you want to set a specific ENS address for a given token.
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS address_overrides (
         names_index INTEGER,
-        chain_id INTEGER,
+        chain_id INTEGER,  
         address TEXT);
     `);
 
@@ -103,6 +110,11 @@ export class SQLiteDatabase {
       this.registerBaseDomain(SMARTCAT_ETH, SMARTCAT_TOKEN, 137, SMARTCAT_TOKEN_OWNER);
     }
 
+    //const csv = this.db.prepare('SELECT * FROM names ORDER BY name').all();
+    //console.log(`${csv.length} entries ${JSON.stringify(csv)}`);
+
+    releaseMode = true;
+
     //get the index of smartcats.eth
     const smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
 
@@ -118,12 +130,19 @@ export class SQLiteDatabase {
     // @ts-ignore
     const tokensIndexExists = columnInfo.some(column => column.name === 'tokens_index');
 
+    this.setupENSIP9Reverse();
+
+    console.log(`entries: ${JSON.stringify(columnInfo)} columnExists ${columnExists} columnNotExists ${columnNotExists} textExists ${textExists} tokensIndexExists ${tokensIndexExists}`);
+
     if (!columnExists) {
       console.log("Updating to add tokenId");
       this.db.exec(`
       ALTER TABLE names
       ADD COLUMN token_id INTEGER;`);
     }
+
+    //const csv2 = this.db.prepare('SELECT * FROM names ORDER BY name').all();
+    //console.log(`${csv2.length} entries2`);
 
     // the addresses entry is now moved into a separate database, as it may not be used 
     // - if not used then we use the default 6551 implementation
@@ -144,6 +163,54 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
 
+    //need to move
+
+    if (!tokensIndexExists) {
+      console.log("Updating to add tokens_index");
+
+      this.db.prepare(`
+        INSERT INTO names_temp (name, contenthash, token_id, tokens_index, createdAt)
+        SELECT name, ? AS contenthash, token_id, ? AS tokens_index, createdAt FROM names
+      `).run("", smartcatsIndex);
+
+      console.log("Updating to add addresses");
+      // one-by-one, find all entries in "names" table that do not have a token_id, and add a new entry in "address_overrides" table with the address extracted from the "addresses" JSON
+      const entries = this.db.prepare('SELECT * FROM names WHERE token_id IS NULL').all();
+      console.log(`${entries.length} entries3`);
+
+      for (const row of entries) {
+        // @ts-ignore
+        const address = row.addresses;
+        if (address) {
+          //no token_id, so we need to add an address override
+          const addresses = JSON.parse(address);
+          // @ts-ignore
+          //console.log(`${row.name} ${JSON.stringify(addresses)}`);
+          const addr60 = addresses[60];
+          if (addr60) {
+            //enter this in address_overrides table, can now fix it, as SMARTCATS is 137
+            //now look up the entry in the names_temp table
+            // @ts-ignore
+            const newEntry = this.db.prepare('SELECT * FROM names_temp WHERE name = ?').get(row.name);
+            // @ts-ignore
+            //console.log(`${row.name} ${newEntry.id} ${ensip9Chain} ${addr60}`);
+            const addrExec = this.db.prepare('INSERT INTO address_overrides (names_index, address, chain_id) VALUES (?, ?, ?)');
+            // @ts-ignore
+            addrExec.run(newEntry.id, addr60, 137);
+          } else {
+            // @ts-ignore
+            console.log(`${row.name} no 60 address`);
+          }
+        }
+      }
+
+    } else {
+      this.db.prepare(`
+        INSERT INTO names_temp (name, contenthash, token_id, tokens_index, createdAt)
+        SELECT name, contenthash, token_id, COALESCE(tokens_index, ?) AS tokens_index, createdAt FROM names
+      `).run(smartcatsIndex);
+    }
+
       this.db.exec(`
             DROP TABLE names;
         `);
@@ -152,23 +219,6 @@ export class SQLiteDatabase {
             ALTER TABLE names_temp RENAME TO names;
         `);
     }
-
-    //now update the tokens_index column
-    if (!tokensIndexExists) {
-      console.log("Updating to add tokens_index");
-      this.db.prepare(`
-        INSERT INTO names (name, contenthash, token_id, tokens_index, createdAt)
-        SELECT 
-            name, 
-            contenthash, 
-            token_id, 
-            COALESCE(tokens_index, ?) AS tokens_index, 
-            createdAt 
-        FROM names
-      `).run(smartcatsIndex);
-    }
-
-    this.setupENSIP9Reverse();
 
     // now run through all entries in "names" table and strip the "name" entry so all the domains are only one name:
     const sql = `
@@ -179,10 +229,16 @@ export class SQLiteDatabase {
     this.db.exec(sql);
     console.log("Domain names stripped.");
 
+    // for debugging
+    //this.dumpNames();
+
+    releaseMode = (RELEASE_MODE == "true");
   }
 
   getTableDump(): string {
     const csv = this.db.prepare('SELECT * FROM names ORDER BY name').all();
+
+    console.log(`${csv.length} entries`);
     // @ts-ignore
     const csvString = csv.map(row => `${row.name},${row.token_id},${row.tokens_index}`).join('\n');
     return csvString;
@@ -234,15 +290,15 @@ export class SQLiteDatabase {
     }
   }
 
-  // name is full domain name eg joe.catcollection.xnft.eth
+  // name is full domain name eg joe.catcollection.xnft.eth, coinType is the ENSIP9 chain id
   addr(chainId: number, name: string, coinType: number) {
     //first get the base domain entry (ie catcollection.xnft.eth)
     const { row, tokenRow } = this.getTokenEntry(name, chainId);
 
-    //console.log(`ROW/TROW ${JSON.stringify(row)} ${JSON.stringify(tokenRow)}`);
+    if (!releaseMode) console.log(`ROW/TROW ${JSON.stringify(row)} ${JSON.stringify(tokenRow)} ${coinType}`);
 
     if (row == null) {
-      console.log("No row");
+      if (!releaseMode) console.log("No row");
       return { addr: ZERO_ADDRESS };
     }
 
@@ -254,20 +310,19 @@ export class SQLiteDatabase {
 
     // @ts-ignore
     const tokenChainId = tokenRow.chain_id;
-    const targetChainId = this.convertCoinTypeToEVMChainId(coinType);
 
     // @ts-ignore
-    const addressOverride = this.db.prepare('SELECT address FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, chainId);
+    const addressOverride = this.db.prepare('SELECT address FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, this.convertCoinTypeToEVMChainId(coinType)); //use EVM chainId in database
 
     //Rules: unless we have additional address in address_overrides then provide 6551 address only for the token chain
     if (addressOverride) {
-      console.log("Override");
+      if (!releaseMode) console.log("Override");
       // @ts-ignore
       return { addr : addressOverride.address };
-    } else if (tokenChainId == targetChainId || targetChainId == 1) {
+    } else if (tokenChainId == chainId || chainId == 1) {
       //calculate the 6551 address
       //console.log("TBA");
-      return { addr: getTokenBoundAccount(targetChainId, tokenContract, tokenId) };
+      return { addr: getTokenBoundAccount(chainId, tokenContract, tokenId) };
     } else {
       //console.log("ZERO ADDRESS");
       return { addr: ZERO_ADDRESS };
@@ -276,12 +331,19 @@ export class SQLiteDatabase {
 
   // name is full domain name eg joe.catcollection.xnft.eth
   updateTokenId(chainId: number, name: string, tokenId: number) {
-    const { row, tokenRow } = this.getTokenEntry(name, chainId);
+    const { row } = this.getTokenEntry(name, chainId);
+
+    if (!releaseMode) console.log(`updateTokenId ${name} ${tokenId} ${JSON.stringify(row)}`);
 
     if (row) {
       try {
-        // @ts-ignore
-        this.db.prepare('UPDATE names SET token_id = ? WHERE name = ? AND tokens_index = ?').run(tokenId, getPrimaryName(name), tokenRow.id);
+        //does this row need tokenId update?
+        if (!row.token_id) {
+          if (!releaseMode) console.log(`updateTokenId2 ${name} ${tokenId} ${JSON.stringify(row)}`);
+          // @ts-ignore
+          this.db.prepare('UPDATE names SET token_id = ? WHERE id = ?').run(tokenId, row.id);
+        }
+        
       } catch (error) {
         console.log(error);
       }
@@ -357,14 +419,18 @@ export class SQLiteDatabase {
   }
 
   text(chainId: number, name: string, key: string) {
-    const { row } = this.getTokenEntry(name, chainId);
+    if (!releaseMode) console.log(`text ${chainId} ${name} ${key}`);
+    const targetChainId = this.convertCoinTypeToEVMChainId(chainId);
+    const { row } = this.getTokenEntry(name, targetChainId);
+
+    if (!releaseMode) console.log(`tokenRow ${JSON.stringify(row)}`);
 
     if (!row) {
       return '';
     } else {
       const textRow = this.db.prepare('SELECT * FROM text_entries WHERE names_index = ? AND key = ?').get(row.id, key.toLowerCase());
       // @ts-ignore
-      console.log(`${name} ${key} ${JSON.stringify(textRow)}`);
+      if (!releaseMode) console.log(`${name} ${key} ${JSON.stringify(textRow)}`);
       if (!textRow) {
         return '';
       } else {
@@ -376,7 +442,9 @@ export class SQLiteDatabase {
 
   // @ts-ignore
   setText(chainId: number, name: string, key: string, value: string) {
-    const { row } = this.getTokenEntry(name, chainId);
+    if (!releaseMode) console.log(`setText ${chainId} ${name} ${key} ${value}`);
+    const targetChainId = this.convertCoinTypeToEVMChainId(chainId);
+    const { row } = this.getTokenEntry(name, targetChainId);
 
     if (!row) {
       return;
@@ -401,7 +469,7 @@ export class SQLiteDatabase {
 
     try {
       const { row } = this.getTokenEntry(name, chainId);
-      //console.log(`${JSON.stringify(row)}`);
+      if (!releaseMode) console.log(`${JSON.stringify(row)}`);
 
       if (row && row.contenthash) {
         contenthash = row.contenthash;
@@ -429,17 +497,17 @@ export class SQLiteDatabase {
   // 2. Can register a subdomain, which is owned by specific owner.
   // 3. If the subdomain is needed to have an additional address on a different chain; this must be explicitly specified, and can only be added by the owner of the original subdomain.
 
-  addElement(name: string, address: string, chainId: number, tokenId: number, owner: string): boolean {
+  addElement(name: string, address: string, chainId: number, tokenId: number, owner: string, ensChainId: number): boolean {
 
     const baseName = getBaseName(name);
 
     //first get the base name index, from the supplying chain and the base name
-    console.log(`addElement ${chainId} : ${name} ${getPrimaryName(name)}`);
+    if (!releaseMode) console.log(`addElement ${chainId} : ${name} ${getPrimaryName(name)}`);
     const baseNameIndex = this.getTokensIndexFromName(chainId, name);
     //const retrieveBaseName = this.getBaseName(chainId, address);
 
     if (baseNameIndex == -1) {
-      console.log(`BaseName ${baseName} not registered on the server, cannot create this domain name`);
+      if (!releaseMode) console.log(`BaseName ${baseName} not registered on the server, cannot create this domain name`);
       return false;
     }
 
@@ -451,8 +519,9 @@ export class SQLiteDatabase {
       if (existingRow.owner == owner) {
         const nameId = this.getNameIndex(baseNameIndex, name);
         //simply add a new address for the required chain
+        var useEnsChainId = ensChainId == 0 ? chainId : ensChainId;
         const addrExec = this.db.prepare('INSERT INTO address_overrides (names_index, address, chain_id) VALUES (?, ?, ?)');
-        addrExec.run(nameId, address, chainId);
+        addrExec.run(nameId, address, useEnsChainId);
         return true;
 
       } else {
@@ -474,15 +543,15 @@ export class SQLiteDatabase {
   }
 
   updateTokenOwner(name: string, chainId: number, owner: string) {
-    console.log(`Updating owner for ${name} ${chainId} ${owner}`);
+    if (!releaseMode) console.log(`Updating owner for ${name} ${chainId} ${owner}`);
 
     const { row } = this.getTokenEntry(name, chainId);
 
     if (row) {
       this.db.prepare('UPDATE names SET owner = ? WHERE id = ?').run(owner, row.id);
-      console.log(`Updated owner for ${name} ${chainId} ${owner}`);
+      if (!releaseMode) console.log(`Updated owner for ${name} ${chainId} ${owner}`);
     } else {
-      console.log(`Couldn't find name ${name} ${chainId}`);
+      if (!releaseMode) console.log(`Couldn't find name ${name} ${chainId}`);
     }
   }
 
@@ -528,6 +597,39 @@ export class SQLiteDatabase {
     return { chainId, tokenContract };
   }
 
+  // For thesmartcats only
+  getNameFromAddress(address: string, tokenId: number): string | null {
+    try {
+      const smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
+      const tokenRow = this.db.prepare('SELECT * FROM tokens WHERE id = ?').get(smartcatsIndex);
+      const addressOverrideEntry = this.db.prepare('SELECT * FROM address_overrides WHERE address = ? AND chain_id = ?').get(address, 137); //must be unique for the chain
+      var row;
+      if (!addressOverrideEntry) {
+        if (!releaseMode) console.log(`Get row from tokenId ${tokenId}`);
+        row = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND tokens_index = ?').get(tokenId, smartcatsIndex);
+      } else {
+        // use addressOverrideEntry
+        // @ts-ignore
+        row = this.db.prepare('SELECT * FROM names WHERE id = ?').get(addressOverrideEntry.names_index);
+        if (!releaseMode) console.log(`Get row from addressOverride ${tokenId} ${JSON.stringify(addressOverrideEntry)}`);
+      }
+      if (row) {
+        if (!releaseMode) console.log(`${address} ${JSON.stringify(row)}`);
+        if (!releaseMode) console.log(`${address} ${JSON.stringify(tokenRow)}`);
+        //get basename
+        // @ts-ignore
+        if (!releaseMode) console.log(`${row.name}.${tokenRow.name}`);
+        // @ts-ignore
+        return `${row.name}.${tokenRow.name}`;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      if (!releaseMode) console.log(`Error: ${error}`);
+      return null;
+    }
+  }
+
   //tokens
   isBaseNameRegistered(chainId: number, baseName: string): boolean {
     try { 
@@ -535,7 +637,7 @@ export class SQLiteDatabase {
       return (row !== undefined);
     } catch (error) {
       // @ts-ignore
-      console.log(`${error.message}`);
+      if (!releaseMode) console.log(`${error.message}`);
       return false;
     }
   }
@@ -543,7 +645,7 @@ export class SQLiteDatabase {
   getTokenContractRegistered(chainId: number, tokenContract: string): boolean {
     try {
       const row = this.db.prepare('SELECT * FROM tokens WHERE chain_id = ? AND token LIKE ?').get(chainId, tokenContract.toLowerCase());
-      console.log(`${tokenContract} ${row} ${row !== undefined}`);
+      if (!releaseMode) console.log(`${tokenContract} ${row} ${row !== undefined}`);
       return (row !== undefined);
     } catch (error) {
       return false;
@@ -553,7 +655,7 @@ export class SQLiteDatabase {
   registerBaseDomain(baseName: string, tokenContract: string, chainId: number, owner: string) {
 
     if (this.isBaseNameRegistered(chainId, baseName)) {
-      console.log(`BaseName ${baseName} already registered on the server, cannot create this domain name`);
+      if (!releaseMode) console.log(`BaseName ${baseName} already registered on the server, cannot create this domain name`);
       return;
     }
 
@@ -562,13 +664,14 @@ export class SQLiteDatabase {
   }
 
   getTokenDetails(chainId: number, baseName: string): BaseNameDef | null {
+    if (!releaseMode) console.log(`getTokenDetails ${chainId} ${baseName}`);
     const row = this.db.prepare('SELECT token FROM tokens WHERE name = ? AND chain_id = ?').get(baseName.toLowerCase(), chainId);
 
     if (row) {
       // @ts-ignore
       return { name: baseName, chainId, tokenContract: row.token };
     } else {
-      return null;
+      return { name: "", chainId: 0, tokenContract: "" };
     }
   }
 
@@ -603,5 +706,42 @@ export class SQLiteDatabase {
     }
 
     return useCoinType;
+  }
+
+
+  dumpNames() {
+    // dump 100 names with tokenId, 100 without
+    const csv4 = this.db.prepare('SELECT * FROM names ORDER BY id').all();
+    var count1: number = 0;
+    var count2: number = 0;
+    for (const row of csv4) {
+      // @ts-ignore
+      if (row.token_id && count1 < 100) {
+        // @ts-ignore
+        const tbaAddr = getTokenBoundAccount(137, SMARTCAT_TOKEN, row.token_id)
+        // @ts-ignore
+        console.log(`* ${row.name}, ${row.token_id}, ${tbaAddr}`);
+        count1++;
+        // @ts-ignore
+      } else if (row.token_id === null && count2 < 100) {
+        
+        // look up address_entry
+        // @ts-ignore
+        const addressOverrideEntry = this.db.prepare('SELECT * FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, 137);
+
+        if (addressOverrideEntry) {
+          // @ts-ignore
+          console.log(`- ${row.name} ${addressOverrideEntry.address}`);
+        } else {
+          // @ts-ignore
+          console.log(`- ${row.name} no address ${ENSIP9_REVERSE.get(137)}`);
+        }
+        count2++;
+      }
+
+      if (count1 >= 100 && count2 >= 100) {
+        break;
+      }
+    }
   }
 }
