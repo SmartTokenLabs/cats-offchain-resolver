@@ -419,9 +419,9 @@ export class SQLiteDatabase {
   }
 
   text(chainId: number, name: string, key: string) {
+
     if (!releaseMode) console.log(`text ${chainId} ${name} ${key}`);
-    const targetChainId = this.convertCoinTypeToEVMChainId(chainId);
-    const { row } = this.getTokenEntry(name, targetChainId);
+    const { row } = this.getTokenEntry(name, chainId);
 
     if (!releaseMode) console.log(`tokenRow ${JSON.stringify(row)}`);
 
@@ -443,8 +443,7 @@ export class SQLiteDatabase {
   // @ts-ignore
   setText(chainId: number, name: string, key: string, value: string) {
     if (!releaseMode) console.log(`setText ${chainId} ${name} ${key} ${value}`);
-    const targetChainId = this.convertCoinTypeToEVMChainId(chainId);
-    const { row } = this.getTokenEntry(name, targetChainId);
+    const { row } = this.getTokenEntry(name, chainId);
 
     if (!row) {
       return;
