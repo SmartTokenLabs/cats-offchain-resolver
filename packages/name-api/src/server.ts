@@ -15,7 +15,7 @@ import {getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain}
 import {isIPFS, tokenAvatarRequest} from "./tokenDiscovery";
 import {getTokenBoundAccount} from "./tokenBound";
 import {ethers, ZeroAddress} from "ethers";
-import {SQLiteDatabase} from "./sqlite";
+import {SQLiteDatabase, SMARTCAT_ETH, SMARTCAT_TOKEN} from "./sqlite";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
@@ -27,8 +27,6 @@ const pump = util.promisify(pipeline);
 export const db: SQLiteDatabase = new SQLiteDatabase(
 	SQLite_DB_FILE, // e.g. 'ensnames.db'
 );
-
-db.initDb();
 
 console.log(`Path to Cert: ${PATH_TO_CERT}`);
 const ipfsAuth = 'Basic ' + Buffer.from(INFURA_IPFS_ID + ':' + INFURA_IPFS_SECRET).toString('base64');
@@ -145,7 +143,8 @@ export async function createServer(){
 		const chainId = parseInt(request.params.chainId);
 		const contenthash = db.contenthash(chainId, name);
 		const hexContent = ipfsHashToHex(contenthash);
-		//console.log(`Contenthash ${name} ${chainId} ${contenthash} ${hexContent}`);
+		console.log(`Contenthash ${name} ${chainId} ${contenthash} ${hexContent}`);
+		
 		return hexContent;
 	});
 
@@ -179,30 +178,34 @@ export async function createServer(){
 		return list;
 	});
 
-	// Deprecate & remove this
-	// input: token address and tokenId
-	/*app.get('/name/:chainid/:address/:tokenid?', async (request, reply) => {
+	// TODO: Deprecate & remove this
+	// Only for thesmartcats; use name/:chainid/:address/:tokenid instead
+	// address is 
+	app.get('/catname/:address/:tokenid?', async (request, reply) => {
 	  const address = request.params.address;
 	  const tokenId = request.params.tokenid;
-	  const chainId = request.params.chainid;
-	  console.log("Addr2: " + address + " tokenid " + tokenId);
-	  const fetchedName = db.getNameFromAddress(chainId, address, tokenId);
-	  if (fetchedName && tokenId) {
+	  // const chainId = request.params.chainid;
+	  //console.log("Addr2: " + address + " tokenid " + tokenId);
+	  
+	  const fetchedName = db.getNameFromAddress(address, tokenId);
+	  console.log(`FetchedName: ${fetchedName}`);
+	  if (fetchedName && getBaseName(fetchedName) == SMARTCAT_ETH) {
 		// check if TBA matches calc:
-		let { chainId, tokenContract } = db.getTokenLocation(fetchedName);
-		if (tokenContract) {
+		let { chainId, tokenContract } = db.getTokenDetails(137, SMARTCAT_ETH);
+		//let { chainId, tokenContract } = db.getTokenLocation(fetchedName);
+		if (tokenContract && tokenId) {
 		  const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
-		  //console.log(`fromUser: ${address} calc:${tbaAccount}`);
-		  if (tbaAccount == address) {
-			db.updateTokenId(fetchedName, tokenId);
+		  //console.log(`fromUser: ${address} calc:${tbaAccount} ${tokenId}`);
+		  if (tbaAccount.toLowerCase() == address.toLowerCase()) {
+			db.updateTokenId(chainId, fetchedName, tokenId);  //chainId: number, name: string, tokenId: number
 		  }
 		}
 	  }
 
 	  return fetchedName;
-	});*/
+	});
 
-	app.get('/getname/:chainid/:address/:tokenid', async (request, reply) => {
+	app.get('/name/:chainid/:address/:tokenid', async (request, reply) => {
 		const address = request.params.address;
 		const tokenId = request.params.tokenid;
 		const chainid = request.params.chainid;
@@ -446,71 +449,198 @@ export async function createServer(){
 		}
 	});
 
+	app.post('/registerForChain/:chainId/:name/:tokenId/:signature/:ensAddress/:ensChainId', async (request, reply) => {
+		return processRegistration(request, reply);
+	});
+
 	app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress?', async (request, reply) => {
-		//tokenContract
+		return processRegistration(request, reply);
+	});
 
+	// app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress/:ensChainId?', async (request, reply) => {
+	// 	const { chainId, tokenId, name, signature, ensAddress } = request.params;
+
+	// 	const numericChainId: number = Number(chainId);
+	// 	const numericEnsChainId: number = 0;
+
+	// 	console.log(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
+
+	// 	if (!db.checkAvailable(chainId, name)) {
+	// 		let returnMsg = { "error": "Name Unavailable" };
+	// 		return reply.status(403).send(returnMsg);
+	// 	}
+
+	// 	//now check domain name is possible to use - must be an entry in the tokens database
+	// 	let baseName = getBaseName(name);
+	// 	console.log(`BaseName: ${baseName}`);
+	// 	if (!db.isBaseNameRegistered(chainId, baseName)) {
+	// 		//this basename hasn't yet been registered
+	// 		return reply.status(403).send({ "fail": `Basename ${baseName} not registered on the server, cannot create this domain name` });
+	// 	}
+
+	// 	//name: baseName, chainId, token: row.token
+	// 	let { tokenContract } = db.getTokenDetails(chainId, baseName);
+
+	// 	console.log(`Register token ${tokenContract}`);
+
+	// 	if ( tokenContract === null ) {
+	// 		return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
+	// 	}
+
+	// 	try {
+	// 		const applyerAddress = recoverAddress(name, tokenId, signature);
+	// 		console.log("APPLY: " + applyerAddress);
+
+	// 		//now determine if user owns the NFT
+	// 		const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
+
+	// 		if (userOwns) {
+	// 			let ensPointAddress = getTokenBoundAccount(numericChainId, tokenContract, tokenId);
+
+	// 			if (ensAddress && ethers.isAddress(ensAddress)) {
+	// 				ensPointAddress = address;
+	// 			}
+
+	// 			console.log("Account: " + ensPointAddress);
+
+	// 			db.addElement(name, ensPointAddress, numericChainId, tokenId, applyerAddress, numericEnsChainId);
+	// 			return reply.status(200).send({ "result": "pass" });
+	// 		} else {
+	// 			return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
+	// 		}
+	// 	} catch (e) {
+	// 		if (lastError.length < 1000) { // don't overflow errors
+	// 			lastError.push(e.message);
+	// 		}
+
+	// 		return reply.status(400).send({ "fail": e.message });
+	// 	}
+	// });
+
+	// app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress?', async (request, reply) => {
+	// 	//tokenContract
+
+	// 	const { chainId, tokenId, name, signature, ensAddress } = request.params;
+
+	// 	const numericChainId: number = Number(chainId);
+	// 	const numericEnsChainId: number = 0;
+
+	// 	console.log(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
+
+	// 	if (!db.checkAvailable(chainId, name)) {
+	// 		let returnMsg = { "error": "Name Unavailable" };
+	// 		return reply.status(403).send(returnMsg);
+	// 	}
+
+	// 	//now check domain name is possible to use - must be an entry in the tokens database
+	// 	let baseName = getBaseName(name);
+	// 	console.log(`BaseName: ${baseName}`);
+	// 	if (!db.isBaseNameRegistered(chainId, baseName)) {
+	// 		//this basename hasn't yet been registered
+	// 		return reply.status(403).send({ "fail": `Basename ${baseName} not registered on the server, cannot create this domain name` });
+	// 	}
+
+	// 	//name: baseName, chainId, token: row.token
+	// 	let { tokenContract } = db.getTokenDetails(chainId, baseName);
+
+	// 	console.log(`Register token ${tokenContract}`);
+
+	// 	if ( tokenContract === null ) {
+	// 		return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
+	// 	}
+
+	// 	try {
+	// 		const applyerAddress = recoverAddress(name, tokenId, signature);
+	// 		console.log("APPLY: " + applyerAddress);
+
+	// 		//now determine if user owns the NFT
+	// 		const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
+
+	// 		if (userOwns) {
+	// 			let ensPointAddress = getTokenBoundAccount(numericChainId, tokenContract, tokenId);
+
+	// 			if (ensAddress && ethers.isAddress(ensAddress)) {
+	// 				ensPointAddress = address;
+	// 			}
+
+	// 			console.log("Account: " + ensPointAddress);
+
+	// 			db.addElement(name, ensPointAddress, numericChainId, tokenId, applyerAddress, numericEnsChainId);
+	// 			return reply.status(200).send({ "result": "pass" });
+	// 		} else {
+	// 			return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
+	// 		}
+	// 	} catch (e) {
+	// 		if (lastError.length < 1000) { // don't overflow errors
+	// 			lastError.push(e.message);
+	// 		}
+
+	// 		return reply.status(400).send({ "fail": e.message });
+	// 	}
+	// });
+
+	async function processRegistration(request, reply) {
 		const { chainId, tokenId, name, signature, ensAddress } = request.params;
-
-		const numericChainId: number = Number(chainId);
+		const numericChainId = Number(chainId);
+		const numericEnsChainId = request.params.ensChainId ? Number(request.params.ensChainId) : 0;
 
 		console.log(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
 
 		if (!db.checkAvailable(chainId, name)) {
-			let returnMsg = { "error": "Name Unavailable" };
-			return reply.status(403).send(returnMsg);
+			return reply.status(403).send({ "error": "Name Unavailable" });
 		}
 
-		//now check domain name is possible to use - must be an entry in the tokens database
 		let baseName = getBaseName(name);
 		console.log(`BaseName: ${baseName}`);
 		if (!db.isBaseNameRegistered(chainId, baseName)) {
-			//this basename hasn't yet been registered
 			return reply.status(403).send({ "fail": `Basename ${baseName} not registered on the server, cannot create this domain name` });
 		}
 
-		//name: baseName, chainId, token: row.token
 		let { tokenContract } = db.getTokenDetails(chainId, baseName);
-
 		console.log(`Register token ${tokenContract}`);
 
-		if ( tokenContract === null ) {
+		if (!tokenContract) {
 			return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
 		}
 
 		try {
 			const applyerAddress = recoverAddress(name, tokenId, signature);
 			console.log("APPLY: " + applyerAddress);
-
-			//now determine if user owns the NFT
 			const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
 
 			if (userOwns) {
 				let ensPointAddress = getTokenBoundAccount(numericChainId, tokenContract, tokenId);
 
 				if (ensAddress && ethers.isAddress(ensAddress)) {
-					ensPointAddress = address;
+					ensPointAddress = ensAddress;
 				}
 
 				console.log("Account: " + ensPointAddress);
-
-				db.addElement(name, ensPointAddress, numericChainId, tokenId, applyerAddress);
+				db.addElement(name, ensPointAddress, numericChainId, tokenId, applyerAddress, numericEnsChainId);
 				return reply.status(200).send({ "result": "pass" });
 			} else {
 				return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
 			}
 		} catch (e) {
-			if (lastError.length < 1000) { // don't overflow errors
+			if (lastError.length < 1000) {  // don't overflow errors
 				lastError.push(e.message);
 			}
-
 			return reply.status(400).send({ "fail": e.message });
 		}
-	});
+	}
 
 	return app;
 }
 
+
 // TODO: Ideally these (and the route functions themselves) are split into separate files
+export function init() {
+	console.log("Initialising");
+	db.initDb();
+	//dumpDb();	
+	console.log("Done");
+}
+
 async function getTokenImage(chainId: number, name: string, tokenId: number) {
 	console.log(`getTokenImage ${chainId} ${name} ${tokenId}`);
 	const { tokenRow } = db.getTokenEntry(name, chainId);
@@ -791,4 +921,9 @@ async function uploadFileToIPFS(filePath: string): Promise<string> {
 	}
 
 	return "";
+}
+
+function dumpDb() {
+	const dump = db.getTableDump();
+	fs.writeFileSync('./dump.csv', dump);
 }
