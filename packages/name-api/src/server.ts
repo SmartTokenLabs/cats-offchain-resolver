@@ -165,24 +165,26 @@ export async function createServer(){
 			chainId = 1; //assume mainnet resolver
 		}
 
+		console.log(`checkname ${name} ${chainId}`);
+
 		if (!db.checkAvailable(chainId, name)) {
-			return "{ result: 'unavailable' }";
+			return { result: 'unavailable' };
 		} else {
-			return "{ result: 'available' }";
+			return { result: 'available' };
 		}
 	});
 
 	app.get('/tokenId/:chainId/:name', async (request, reply) => {
 		const name = request.params.name;
 		const chainId = request.params.chainId;
-		return `{ tokenId: ${db.getTokenIdFromName(chainId, name)} }`;
+		return { result: db.getTokenIdFromName(chainId, name)};
 	});
 
 	app.get('/image/:name/:chainId', async (request, reply) => {
 		const name = request.params.name;
 		const chainId = request.params.chainId;
 		const tokenId = db.getTokenIdFromName(chainId, name);
-		return { name: getTokenImage(chainId, name, tokenId) };
+		return { result: getTokenImage(chainId, name, tokenId) };
 	});
 
 	app.get('/droptables/:page', async (request, reply) => {
@@ -216,7 +218,7 @@ export async function createServer(){
 		}
 	  }
 
-	  return fetchedName;
+	  return { result: `${fetchedName}` };
 	});
 
 	app.get('/name/:chainid/:address/:tokenid', async (request, reply) => {
