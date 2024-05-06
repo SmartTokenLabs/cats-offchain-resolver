@@ -481,14 +481,8 @@ export class SQLiteDatabase {
   }
 
   checkAvailable(chainId: number, name: string): boolean {
-    //console.log(`checkAvailable ${chainId} : ${name}`);
-    const tokenIndex = this.getTokensIndexFromName(chainId, name);
-    if (tokenIndex >= 0) {
-      const row = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(name, tokenIndex);
-      return !row;
-    } else {
-      return false;
-    }
+    const { row } = this.getTokenEntry(name, chainId);
+    return row == undefined;
   }
 
   //Structure:

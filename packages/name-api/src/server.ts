@@ -157,10 +157,15 @@ export async function createServer(){
 		return hexContent;
 	});
 
-	app.get('/checkname/:chainId/:name', async (request, reply) => {
-		const name = request.params.name;
-		const chainId = request.params.chainId;
-		if (!db.checkAvailable(name)) {
+	app.get('/checkname/:chainIdOrName/:name?', async (request, reply) => {
+		var name = request.params.name;
+		var chainId = request.params.chainIdOrName;
+		if (request.params.name === undefined) {
+			name = request.params.chainIdOrName;
+			chainId = 1; //assume mainnet resolver
+		}
+
+		if (!db.checkAvailable(chainId, name)) {
 			return "{ result: 'unavailable' }";
 		} else {
 			return "{ result: 'available' }";
