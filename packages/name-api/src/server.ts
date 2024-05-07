@@ -824,7 +824,9 @@ function recoverTextAddress(name: string, chainId: number, key: string, text: st
 async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddress: string, tokenId: string): Promise<boolean> {
 
 	if (!chainId)
+	{
 		throw new Error("Missing chain config");
+	}
 
 	consoleLog(`Owner: ${applyerAddress} ${contractAddress} ${tokenId}`);
 
