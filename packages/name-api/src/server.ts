@@ -620,7 +620,7 @@ export async function createServer(){
 		}
 
 		try {
-			const applyerAddress = recoverAddress(name, tokenId, signature);
+			const applyerAddress = recoverAddress(name, numericChainId, tokenId, signature);
 			consoleLog("APPLY: " + applyerAddress);
 			const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
 
@@ -775,14 +775,14 @@ async function getOwnerAddress(chainId: number, name: string, tokenAddress: stri
 	return ownerAddress;
 }
 
-function recoverAddress(name: string, tokenId: string, signature: string): string {
-	const message = `Registering your tokenId ${tokenId} name to ${name}`;
+function recoverAddress(name: string, chainID: number, tokenId: string, signature: string): string {
+	const message = `Registering your tokenId ${tokenId} name to ${name} on chain ${chainID}`;
 	consoleLog("MSG: " + message);
 	return ethers.verifyMessage(message, addHexPrefix(signature));
 }
 
-function recoverRegistrationAddress(name: string, tokenContract: string, signature: string): string {
-	const message = `Attempting to register domain ${name} name to ${tokenContract}`;
+function recoverRegistrationAddress(name: string, chainID: number, tokenContract: string, signature: string): string {
+	const message = `Attempting to register domain ${name} name to ${tokenContract} on chain ${chainID}`;
 	consoleLog("MSG: " + message);
 	consoleLog(`SIG: ${signature}`);
 	if (signature.length < 130 || signature.length > 132) {
@@ -795,7 +795,7 @@ function recoverRegistrationAddress(name: string, tokenContract: string, signatu
 
 function recoverStorageAddress(name: string, chainId: number, signature: string, ipfsHash: string): string {
 	var message = `Attempting to update storage to domain ${name} on ${chainId}`;
-	if (ipfsHash) { // Only accept without hash if user is whitelisted
+	if (ipfsHash) { // TODO: Only accept without hash if user is whitelisted
 		message += ` with hash ${ipfsHash}`;
 	}
 
