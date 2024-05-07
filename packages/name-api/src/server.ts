@@ -826,6 +826,8 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
 	if (!chainId)
 		throw new Error("Missing chain config");
 
+	consoleLog(`Owner: ${applyerAddress} ${contractAddress} ${tokenId}`);
+
 	// Spamming protection
 	if (checkCachedResults(chainId, contractAddress, applyerAddress, tokenId)) {
 		return useCachedValue(chainId, contractAddress, applyerAddress, tokenId);
