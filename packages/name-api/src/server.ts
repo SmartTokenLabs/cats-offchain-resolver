@@ -66,7 +66,7 @@ const lastError: string[] = [];
 const coinTypeRoute: string[] = [];
 
 function consoleLog(msg: string) {
-	if (releaseMode) {
+	if (!releaseMode) {
 		console.log(msg);
 	}
 }
