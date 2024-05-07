@@ -350,7 +350,7 @@ export async function createServer(){
 		}
 
 		try {
-			const applyerAddress = recoverRegistrationAddress(name, tokenContract, signature);
+			const applyerAddress = recoverRegistrationAddress(name, numericChainId, tokenContract, signature);
 			consoleLog("Registration address: " + applyerAddress);
 
 			//check if address owns this name (either onchain, or registered here)
