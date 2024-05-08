@@ -196,7 +196,7 @@ export async function createServer(){
 
 	// TODO: Deprecate & remove this
 	// Only for thesmartcats; use name/:chainid/:address/:tokenid instead
-	// address is 
+	// address is the TBA address
 	app.get('/catname/:address/:tokenid?', async (request, reply) => {
 	  const address = request.params.address;
 	  const tokenId = request.params.tokenid;
