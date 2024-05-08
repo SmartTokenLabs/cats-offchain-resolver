@@ -226,7 +226,7 @@ export async function createServer(){
 		const tokenId = request.params.tokenid;
 		const chainid = request.params.chainid;
 		consoleLog("getName Addr: " + address + " tokenid " + tokenId + " chainid " + chainid);
-		return db.getNameFromToken(chainid, address, tokenId);
+		return { result: db.getNameFromToken(chainid, address, tokenId) };
 	});
 
 	app.get('/addr/:name/:coinType/:chainId', async (request, reply) => {
