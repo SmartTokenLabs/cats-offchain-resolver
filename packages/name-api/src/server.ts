@@ -321,9 +321,11 @@ export async function createServer(){
 
 		//consoleLog(`Check DB for basename `);
 
+		let baseName = getBaseName(name);
+
 		//first check if name already exists
-		if (db.isBaseNameRegistered(chainId, getBaseName(name))) {
-			return reply.status(403).send({ "fail": `Base name ${getBaseName(name)} already registered` });
+		if (db.isBaseNameRegistered(chainId, baseName)) {
+			return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
 		}
 
 		//consoleLog(`Check DB for tokencontract `);
@@ -333,20 +335,20 @@ export async function createServer(){
 			return reply.status(403).send({ "fail": `Token Contract ${chainId} : ${tokenContract} already registered` });
 		}
 
-		consoleLog(`Check resolver ${name} (${getBaseName(name)})`);
+		consoleLog(`Check resolver ${name} (${baseName})`);
 
 		//now check that resolver contract is correct
-		let nameHash = await sendResolverRequest(getBaseName(name), numericEnsChainId !== null ? numericEnsChainId : 1); // use ENS Chain if specified to allow testnet dev
+		let nameHash = await sendResolverRequest(baseName, numericEnsChainId !== null ? numericEnsChainId : 1); // use ENS Chain if specified to allow testnet dev
 		let result = await waitForCheck(nameHash, chainId);
 
 		if (result == ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE) {
 			return reply.status(403).send({ "fail": `Resolver not correctly set for gateway.` });
 		} else if (result == ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET) {
-			return reply.status(403).send({ "fail": `Intermediate name resolver ${getBaseName(name)} not set correctly.` });
+			return reply.status(403).send({ "fail": `Intermediate name resolver ${baseName} not set correctly.` });
 		} else if (result == ResolverStatus.CHAIN_MISMATCH) {
-			return reply.status(403).send({ "fail": `Chain mismatch for ${getBaseName(name)} and ${chainId}.` });
+			return reply.status(403).send({ "fail": `Chain mismatch for ${baseName} and ${chainId}.` });
 		} else if (result == ResolverStatus.NOT_FOUND) {
-			return reply.status(403).send({ "fail": `Name not found for ${getBaseName(name)} and ${chainId}.` });
+			return reply.status(403).send({ "fail": `Name not found for ${baseName} and ${chainId}.` });
 		}
 
 		try {
