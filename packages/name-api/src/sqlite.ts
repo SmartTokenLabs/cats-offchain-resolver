@@ -627,6 +627,7 @@ export class SQLiteDatabase {
   isBaseNameRegistered(chainId: number, baseName: string): boolean {
     try { 
       const row = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ?').get(baseName.toLowerCase(), chainId);
+      if (!releaseMode) console.log(`isBaseNameRegistered ${baseName} ${JSON.stringify(row)}`);
       return (row !== undefined);
     } catch (error) {
       // @ts-ignore
