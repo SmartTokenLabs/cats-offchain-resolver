@@ -284,7 +284,11 @@ export async function userOwnsDomain(baseName: string, domainName: string, apply
   export function getBaseName(name: string): string {
     //base name is now just the front domain removed
     let firstIndex = name.indexOf('.');
-    return name.slice(firstIndex+1);
+    if (firstIndex < name.lastIndexOf('.')) {
+        return name.slice(firstIndex+1);
+    } else {
+        return name;
+    }
   }
 
   export function getPrimaryName(name: string): string {

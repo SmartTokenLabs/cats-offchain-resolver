@@ -419,9 +419,9 @@ export class SQLiteDatabase {
   }
 
   text(chainId: number, name: string, key: string) {
+
     if (!releaseMode) console.log(`text ${chainId} ${name} ${key}`);
-    const targetChainId = this.convertCoinTypeToEVMChainId(chainId);
-    const { row } = this.getTokenEntry(name, targetChainId);
+    const { row } = this.getTokenEntry(name, chainId);
 
     if (!releaseMode) console.log(`tokenRow ${JSON.stringify(row)}`);
 
@@ -443,8 +443,7 @@ export class SQLiteDatabase {
   // @ts-ignore
   setText(chainId: number, name: string, key: string, value: string) {
     if (!releaseMode) console.log(`setText ${chainId} ${name} ${key} ${value}`);
-    const targetChainId = this.convertCoinTypeToEVMChainId(chainId);
-    const { row } = this.getTokenEntry(name, targetChainId);
+    const { row } = this.getTokenEntry(name, chainId);
 
     if (!row) {
       return;
@@ -482,14 +481,8 @@ export class SQLiteDatabase {
   }
 
   checkAvailable(chainId: number, name: string): boolean {
-    //console.log(`checkAvailable ${chainId} : ${name}`);
-    const tokenIndex = this.getTokensIndexFromName(chainId, name);
-    if (tokenIndex >= 0) {
-      const row = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(name, tokenIndex);
-      return !row;
-    } else {
-      return false;
-    }
+    const { row } = this.getTokenEntry(name, chainId);
+    return row == undefined;
   }
 
   //Structure:
@@ -634,6 +627,7 @@ export class SQLiteDatabase {
   isBaseNameRegistered(chainId: number, baseName: string): boolean {
     try { 
       const row = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ?').get(baseName.toLowerCase(), chainId);
+      if (!releaseMode) console.log(`isBaseNameRegistered ${baseName} ${JSON.stringify(row)}`);
       return (row !== undefined);
     } catch (error) {
       // @ts-ignore
