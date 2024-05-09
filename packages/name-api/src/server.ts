@@ -496,7 +496,12 @@ export async function createServer(){
 		consoleLog(`Register token ${tokenContract}`);
 
 		if (!tokenContract) {
-			return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
+			return reply.status(403).send({ "fail": `Basename ${baseName} not registered` });
+		}
+
+		//check if tokenId is already registered
+		if (db.isTokenIdRegistered(numericChainId, tokenContract, tokenId)) {
+			return reply.status(403).send({ "fail": `TokenId ${tokenId} already registered` });
 		}
 
 		//Have they already registered this token?
@@ -527,7 +532,7 @@ export async function createServer(){
 			if (lastError.length < 1000) {  // don't overflow errors
 				lastError.push(e.message);
 			}
-			return reply.status(400).send({ "fail": e.message });
+			return reply.status(403).send({ "fail": e.message });
 		}
 	}
 

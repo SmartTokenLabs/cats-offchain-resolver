@@ -398,6 +398,14 @@ export class SQLiteDatabase {
     return { row, tokenRow };
   }
 
+  //has this tokenId registered a name for this domain?
+  isTokenIdRegistered(chainId: number, tokenContract: string, tokenId: string): boolean {
+    const tokenRow = this.db.prepare('SELECT * FROM tokens WHERE token = ? AND chain_id = ?').get(tokenContract, chainId);
+    // @ts-ignore
+    const row = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND tokens_index = ?').get(tokenId, tokenRow.id);
+    return row !== undefined;
+  }
+
   //return db.getNameFromToken(chainid, address, tokenId);
   getNameFromToken(chainId: number, address: string, tokenId: number): string | null {
 
