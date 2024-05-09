@@ -355,8 +355,21 @@ export async function createServer(){
 			const applyerAddress = recoverRegistrationAddress(name, numericChainId, tokenContract, signature);
 			consoleLog("Registration address: " + applyerAddress);
 
-			//check if address owns this name (either onchain, or registered here)
-			const userOwns = await userOwnsDomain(getBaseName(name), name, applyerAddress, numericChainId);
+			var userOwns = false;
+
+			if (baseName.toLowerCase() === name.toLowerCase()) {
+				consoleLog("Check domain ownership");
+				userOwns = await userOwnsDomain(getBaseName(name), name, applyerAddress, numericChainId);
+			} else {
+				consoleLog("Check token ownership");
+				const contractOwner = await contractOwner(numericChainId, tokenContract);
+				consoleLog(`contractOwner ${contractOwner}`);
+
+				userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
+					: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
+							// TODO: If no owner, then require a approval signature to create the domain name
+							// Note: We don't have resources to implement this yet
+			}
 
 			consoleLog(`OWNS: ${userOwns}`);
 
@@ -375,6 +388,109 @@ export async function createServer(){
 			return reply.status(400).send({ "fail": e.message });
 		}
 	});
+
+	app.post('/testregistertoken/:chainId/:tokenContract/:name/:signature/:ensChainId?', async (request, reply) => {
+
+		const { chainId, tokenContract, name, signature, ensChainId } = request.params;
+
+		const numericChainId: number = Number(chainId);
+		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : 1);
+
+		const santisedName = name.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
+
+		consoleLog(`Sanitised name: ${santisedName}`);
+
+		if (santisedName !== name) {
+			return reply.status(403).send({ "fail": `This name contains illegal characters ${name} vs ${santisedName}` });
+		}
+
+		if (name.length > NAME_LIMIT) {
+			return reply.status(403).send({ "fail": `Domain name too long, limit is ${NAME_LIMIT} characters.` });
+		}
+
+		//consoleLog(`Check DB for basename `);
+
+		let baseName = getBaseName(name);
+
+		//first check if name already exists
+		if (db.isBaseNameRegistered(chainId, baseName)) {
+			consoleLog(`Base name ${baseName} already registered`);
+			//return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
+		}
+
+		//consoleLog(`Check DB for tokencontract `);
+
+		// Has this token previously been registered?
+		if (db.getTokenContractRegistered(chainId, tokenContract)) {
+			consoleLog(`Token Contract ${chainId} : ${tokenContract} already registered`);
+			//return reply.status(403).send({ "fail": `Token Contract ${chainId} : ${tokenContract} already registered` });
+		}
+
+		consoleLog(`Check resolver ${name} (${baseName})`);
+
+		//now check that resolver contract is correct
+		let nameHash = await sendResolverRequest(baseName, numericEnsChainId !== null ? numericEnsChainId : 1); // use ENS Chain if specified to allow testnet dev
+		let result = await waitForCheck(nameHash, chainId);
+
+		if (result == ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE) {
+			return reply.status(403).send({ "fail": `Resolver not correctly set for gateway.` });
+		} else if (result == ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET) {
+			return reply.status(403).send({ "fail": `Intermediate name resolver ${baseName} not set correctly.` });
+		} else if (result == ResolverStatus.CHAIN_MISMATCH) {
+			return reply.status(403).send({ "fail": `Chain mismatch for ${baseName} and ${chainId}.` });
+		} else if (result == ResolverStatus.NOT_FOUND) {
+			return reply.status(403).send({ "fail": `Name not found for ${baseName} and ${chainId}.` });
+		}
+
+		try {
+			const applyerAddress = recoverRegistrationAddress(name, numericChainId, tokenContract, signature);
+			consoleLog("Registration address: " + applyerAddress);
+
+			var userOwns = false;
+
+			if (baseName.toLowerCase() === name.toLowerCase()) {
+				consoleLog("Check domain ownership");
+				userOwns = await userOwnsDomain(getBaseName(name), name, applyerAddress, numericChainId);
+			} else {
+				consoleLog("Check token ownership");
+				const contractOwner = await contractOwner(numericChainId, tokenContract);
+				consoleLog(`contractOwner ${contractOwner}`);
+
+				userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
+					: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
+							// TODO: If no owner, then require a approval signature to create the domain name
+							// Note: We don't have resources to implement this yet
+			}
+
+			consoleLog(`OWNS: ${userOwns}`);
+
+			if (userOwns) {
+				//db.registerBaseDomain(name, tokenContract, numericChainId, applyerAddress);
+				return reply.status(200).send({ "result": "pass" });
+			} else {
+				// @ts-ignore
+				return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
+			}
+		} catch (e) {
+			if (lastError.length < 1000) { // don't overflow errors
+				lastError.push(e.message);
+			}
+
+			return reply.status(400).send({ "fail": e.message });
+		}
+	});
+
+	async function contractOwner(chainId: number, contractAddress: string): Promise<string> {
+		const provider = getProvider(chainId);
+
+		const contract = new ethers.Contract(contractAddress, [
+			'function owner() view returns (address)'
+		], provider);
+
+		const owner = await contract.owner();
+		consoleLog(`Owner: ${owner}`);
+		return owner;
+	}
 
 	app.post("/registertext/:chainId/:name/:key/:text/:signature", async (request, reply) => {
 		const { chainId, name, key, text, signature } = request.params;
