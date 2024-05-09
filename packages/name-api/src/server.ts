@@ -475,128 +475,6 @@ export async function createServer(){
 		return processRegistration(request, reply);
 	});
 
-	// app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress/:ensChainId?', async (request, reply) => {
-	// 	const { chainId, tokenId, name, signature, ensAddress } = request.params;
-
-	// 	const numericChainId: number = Number(chainId);
-	// 	const numericEnsChainId: number = 0;
-
-	// 	consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
-
-	// 	if (!db.checkAvailable(chainId, name)) {
-	// 		let returnMsg = { "error": "Name Unavailable" };
-	// 		return reply.status(403).send(returnMsg);
-	// 	}
-
-	// 	//now check domain name is possible to use - must be an entry in the tokens database
-	// 	let baseName = getBaseName(name);
-	// 	consoleLog(`BaseName: ${baseName}`);
-	// 	if (!db.isBaseNameRegistered(chainId, baseName)) {
-	// 		//this basename hasn't yet been registered
-	// 		return reply.status(403).send({ "fail": `Basename ${baseName} not registered on the server, cannot create this domain name` });
-	// 	}
-
-	// 	//name: baseName, chainId, token: row.token
-	// 	let { tokenContract } = db.getTokenDetails(chainId, baseName);
-
-	// 	consoleLog(`Register token ${tokenContract}`);
-
-	// 	if ( tokenContract === null ) {
-	// 		return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
-	// 	}
-
-	// 	try {
-	// 		const applyerAddress = recoverAddress(name, tokenId, signature);
-	// 		consoleLog("APPLY: " + applyerAddress);
-
-	// 		//now determine if user owns the NFT
-	// 		const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
-
-	// 		if (userOwns) {
-	// 			let ensPointAddress = getTokenBoundAccount(numericChainId, tokenContract, tokenId);
-
-	// 			if (ensAddress && ethers.isAddress(ensAddress)) {
-	// 				ensPointAddress = address;
-	// 			}
-
-	// 			consoleLog("Account: " + ensPointAddress);
-
-	// 			db.addElement(name, ensPointAddress, numericChainId, tokenId, applyerAddress, numericEnsChainId);
-	// 			return reply.status(200).send({ "result": "pass" });
-	// 		} else {
-	// 			return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
-	// 		}
-	// 	} catch (e) {
-	// 		if (lastError.length < 1000) { // don't overflow errors
-	// 			lastError.push(e.message);
-	// 		}
-
-	// 		return reply.status(400).send({ "fail": e.message });
-	// 	}
-	// });
-
-	// app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress?', async (request, reply) => {
-	// 	//tokenContract
-
-	// 	const { chainId, tokenId, name, signature, ensAddress } = request.params;
-
-	// 	const numericChainId: number = Number(chainId);
-	// 	const numericEnsChainId: number = 0;
-
-	// 	consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
-
-	// 	if (!db.checkAvailable(chainId, name)) {
-	// 		let returnMsg = { "error": "Name Unavailable" };
-	// 		return reply.status(403).send(returnMsg);
-	// 	}
-
-	// 	//now check domain name is possible to use - must be an entry in the tokens database
-	// 	let baseName = getBaseName(name);
-	// 	consoleLog(`BaseName: ${baseName}`);
-	// 	if (!db.isBaseNameRegistered(chainId, baseName)) {
-	// 		//this basename hasn't yet been registered
-	// 		return reply.status(403).send({ "fail": `Basename ${baseName} not registered on the server, cannot create this domain name` });
-	// 	}
-
-	// 	//name: baseName, chainId, token: row.token
-	// 	let { tokenContract } = db.getTokenDetails(chainId, baseName);
-
-	// 	consoleLog(`Register token ${tokenContract}`);
-
-	// 	if ( tokenContract === null ) {
-	// 		return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
-	// 	}
-
-	// 	try {
-	// 		const applyerAddress = recoverAddress(name, tokenId, signature);
-	// 		consoleLog("APPLY: " + applyerAddress);
-
-	// 		//now determine if user owns the NFT
-	// 		const userOwns = await userOwnsNFT(numericChainId, tokenContract, applyerAddress, tokenId);
-
-	// 		if (userOwns) {
-	// 			let ensPointAddress = getTokenBoundAccount(numericChainId, tokenContract, tokenId);
-
-	// 			if (ensAddress && ethers.isAddress(ensAddress)) {
-	// 				ensPointAddress = address;
-	// 			}
-
-	// 			consoleLog("Account: " + ensPointAddress);
-
-	// 			db.addElement(name, ensPointAddress, numericChainId, tokenId, applyerAddress, numericEnsChainId);
-	// 			return reply.status(200).send({ "result": "pass" });
-	// 		} else {
-	// 			return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
-	// 		}
-	// 	} catch (e) {
-	// 		if (lastError.length < 1000) { // don't overflow errors
-	// 			lastError.push(e.message);
-	// 		}
-
-	// 		return reply.status(400).send({ "fail": e.message });
-	// 	}
-	// });
-
 	async function processRegistration(request, reply) {
 		const { chainId, tokenId, name, signature, ensAddress } = request.params;
 		const numericChainId = Number(chainId);
@@ -619,6 +497,12 @@ export async function createServer(){
 
 		if (!tokenContract) {
 			return reply.status(400).send({ "fail": `Basename ${baseName} not registered` });
+		}
+
+		//Have they already registered this token?
+		const currentName = db.getNameFromToken(chainid, tokenContract, tokenId);
+		if (currentName == null) {
+			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
 
 		try {
