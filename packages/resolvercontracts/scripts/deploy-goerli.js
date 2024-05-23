@@ -65,8 +65,8 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
     console.log(`NAMEHASH: ${xnftNode}`);
 
     //update URL
-    let updateUrl = await customResolver.connect(goerliKey).updateUrl(localTestUri);
-    await updateUrl.wait();
+    //let updateUrl = await customResolver.connect(goerliKey).updateUrl(localTestUri);
+    //await updateUrl.wait();
 
     //set resolver
     //let updateResolverTx = await registry.connect(goerliKey).setResolver(xnftNode, localResolverAddr);

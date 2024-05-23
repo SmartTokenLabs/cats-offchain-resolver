@@ -31,7 +31,7 @@ let releaseMode = true;
 
 function customLogger(query: any) {
   if (!releaseMode) {
-      console.log(query);
+    console.log(query);
   }
 }
 
@@ -44,12 +44,13 @@ export class SQLiteDatabase {
 
     /*this.db.exec(`
       DROP TABLE IF EXISTS names;
-    `)
+    `)*/
 
-    this.db.exec(`
+    /*this.db.exec(`
       DROP TABLE IF EXISTS tokens;
-    `)
+    `)*/
 
+    /*
     this.db.exec(`
       DROP TABLE IF EXISTS address_overrides;
     `)
@@ -57,7 +58,7 @@ export class SQLiteDatabase {
     this.db.exec(`
       DROP TABLE IF_EXISTS text_entries;
     `)*/
-    
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS names (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,6 +76,7 @@ export class SQLiteDatabase {
         name TEXT,
         token TEXT,
         chain_id INTEGER,
+        resolver_chain INTEGER,
         owner TEXT,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
     `);
@@ -104,19 +106,48 @@ export class SQLiteDatabase {
   // This migrates data from the existing database. Not needed after the first run
   initDb() {
 
-    // add thesmartcats.eth entry
-    if (!this.isBaseNameRegistered(137, SMARTCAT_ETH)) {
-      console.log(`Adding smartcats`);
-      this.registerBaseDomain(SMARTCAT_ETH, SMARTCAT_TOKEN, 137, SMARTCAT_TOKEN_OWNER);
+    //get the index of smartcats.eth
+    var smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
+
+    const tokensColumns = this.db.prepare("PRAGMA table_info(tokens)").all();
+    // @ts-ignore
+    const tokensResolverChainExists = tokensColumns.some(column => column.name === 'resolver_chain');
+
+    if (!tokensResolverChainExists) {
+      //drop tables here
+      console.log("Updating to add resolver_chain");
+
+      this.db.exec(`
+      ALTER TABLE tokens
+      ADD COLUMN resolver_chain INTEGER;`);
+
+      if (smartcatsIndex != -1) {
+        // @ts-ignore
+        this.db.prepare('UPDATE tokens SET resolver_chain = 1 WHERE id = ?').run(smartcatsIndex);
+      }
     }
+
+    //dump all tokens
+    // const csv = this.db.prepare('SELECT * FROM tokens ORDER BY name').all();
+    // for (const row of csv) {
+    //   // @ts-ignore
+    //   console.log(`TOKEN: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
+    // }
+
+    // add thesmartcats.eth entry if required
+    if (smartcatsIndex == -1) {
+      console.log(`Adding smartcats`);
+      this.registerBaseDomain(SMARTCAT_ETH, SMARTCAT_TOKEN, 137, 1, SMARTCAT_TOKEN_OWNER);
+      smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
+    }
+
+    //get the index of smartcats.eth
+    //const smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
 
     //const csv = this.db.prepare('SELECT * FROM names ORDER BY name').all();
     //console.log(`${csv.length} entries ${JSON.stringify(csv)}`);
 
     releaseMode = true;
-
-    //get the index of smartcats.eth
-    const smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
 
     console.log(`Smartcats index: ${smartcatsIndex}`);
 
@@ -141,8 +172,8 @@ export class SQLiteDatabase {
       ADD COLUMN token_id INTEGER;`);
     }
 
-    //const csv2 = this.db.prepare('SELECT * FROM names ORDER BY name').all();
-    //console.log(`${csv2.length} entries2`);
+    const csv2 = this.db.prepare('SELECT * FROM names ORDER BY name').all();
+    console.log(`${csv2.length} entries2`);
 
     // the addresses entry is now moved into a separate database, as it may not be used 
     // - if not used then we use the default 6551 implementation
@@ -163,53 +194,53 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
 
-    //need to move
+      //need to move
 
-    if (!tokensIndexExists) {
-      console.log("Updating to add tokens_index");
+      if (!tokensIndexExists) {
+        console.log("Updating to add tokens_index");
 
-      this.db.prepare(`
+        this.db.prepare(`
         INSERT INTO names_temp (name, contenthash, token_id, tokens_index, createdAt)
         SELECT name, ? AS contenthash, token_id, ? AS tokens_index, createdAt FROM names
       `).run("", smartcatsIndex);
 
-      console.log("Updating to add addresses");
-      // one-by-one, find all entries in "names" table that do not have a token_id, and add a new entry in "address_overrides" table with the address extracted from the "addresses" JSON
-      const entries = this.db.prepare('SELECT * FROM names WHERE token_id IS NULL').all();
-      console.log(`${entries.length} entries3`);
+        console.log("Updating to add addresses");
+        // one-by-one, find all entries in "names" table that do not have a token_id, and add a new entry in "address_overrides" table with the address extracted from the "addresses" JSON
+        const entries = this.db.prepare('SELECT * FROM names WHERE token_id IS NULL').all();
+        console.log(`${entries.length} entries3`);
 
-      for (const row of entries) {
-        // @ts-ignore
-        const address = row.addresses;
-        if (address) {
-          //no token_id, so we need to add an address override
-          const addresses = JSON.parse(address);
+        for (const row of entries) {
           // @ts-ignore
-          //console.log(`${row.name} ${JSON.stringify(addresses)}`);
-          const addr60 = addresses[60];
-          if (addr60) {
-            //enter this in address_overrides table, can now fix it, as SMARTCATS is 137
-            //now look up the entry in the names_temp table
+          const address = row.addresses;
+          if (address) {
+            //no token_id, so we need to add an address override
+            const addresses = JSON.parse(address);
             // @ts-ignore
-            const newEntry = this.db.prepare('SELECT * FROM names_temp WHERE name = ?').get(row.name);
-            // @ts-ignore
-            //console.log(`${row.name} ${newEntry.id} ${ensip9Chain} ${addr60}`);
-            const addrExec = this.db.prepare('INSERT INTO address_overrides (names_index, address, chain_id) VALUES (?, ?, ?)');
-            // @ts-ignore
-            addrExec.run(newEntry.id, addr60, 137);
-          } else {
-            // @ts-ignore
-            console.log(`${row.name} no 60 address`);
+            //console.log(`${row.name} ${JSON.stringify(addresses)}`);
+            const addr60 = addresses[60];
+            if (addr60) {
+              //enter this in address_overrides table, can now fix it, as SMARTCATS is 137
+              //now look up the entry in the names_temp table
+              // @ts-ignore
+              const newEntry = this.db.prepare('SELECT * FROM names_temp WHERE name = ?').get(row.name);
+              // @ts-ignore
+              //console.log(`${row.name} ${newEntry.id} ${ensip9Chain} ${addr60}`);
+              const addrExec = this.db.prepare('INSERT INTO address_overrides (names_index, address, chain_id) VALUES (?, ?, ?)');
+              // @ts-ignore
+              addrExec.run(newEntry.id, addr60, 137);
+            } else {
+              // @ts-ignore
+              console.log(`${row.name} no 60 address`);
+            }
           }
         }
-      }
 
-    } else {
-      this.db.prepare(`
+      } else {
+        this.db.prepare(`
         INSERT INTO names_temp (name, contenthash, token_id, tokens_index, createdAt)
         SELECT name, contenthash, token_id, COALESCE(tokens_index, ?) AS tokens_index, createdAt FROM names
       `).run(smartcatsIndex);
-    }
+      }
 
       this.db.exec(`
             DROP TABLE names;
@@ -267,16 +298,6 @@ export class SQLiteDatabase {
     }
   }
 
-  getBaseNameFromDB(chainId: number, tokenContract: string): string {
-    const row = this.db.prepare('SELECT name FROM tokens WHERE token = ? AND chain_id = ?').get(tokenContract, chainId);
-    if (row) {
-      // @ts-ignore
-      return row.name;
-    } else {
-      return "";
-    }
-  }
-
   // the Name input here is assumed to be the full ENS name eg: frodo.xnft.eth
   getTokensIndexFromName(chainId: number, name: string): number {
     var nname: string = getBaseName(name);
@@ -311,18 +332,22 @@ export class SQLiteDatabase {
     // @ts-ignore
     const tokenChainId = tokenRow.chain_id;
 
+    const coinChainId = this.convertCoinTypeToEVMChainId(coinType);
+
+    console.log(`addr ${name} ${coinType} ${tokenId} ${tokenContract} ${tokenChainId} ${coinChainId}`);
+
     // @ts-ignore
-    const addressOverride = this.db.prepare('SELECT address FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, this.convertCoinTypeToEVMChainId(coinType)); //use EVM chainId in database
+    const addressOverride = this.db.prepare('SELECT address FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, coinChainId); //use EVM chainId in database
 
     //Rules: unless we have additional address in address_overrides then provide 6551 address only for the token chain
     if (addressOverride) {
       if (!releaseMode) console.log("Override");
       // @ts-ignore
-      return { addr : addressOverride.address };
-    } else if (tokenChainId == chainId || chainId == 1) {
-      //calculate the 6551 address
+      return { addr: addressOverride.address };
+    } else if (tokenChainId == coinChainId) {
+      //calculate the 6551 address for the chainId of the token
       //console.log("TBA");
-      return { addr: getTokenBoundAccount(chainId, tokenContract, tokenId) };
+      return { addr: getTokenBoundAccount(coinChainId, tokenContract, tokenId) };
     } else {
       //console.log("ZERO ADDRESS");
       return { addr: ZERO_ADDRESS };
@@ -343,7 +368,7 @@ export class SQLiteDatabase {
           // @ts-ignore
           this.db.prepare('UPDATE names SET token_id = ? WHERE id = ?').run(tokenId, row.id);
         }
-        
+
       } catch (error) {
         console.log(error);
       }
@@ -386,8 +411,8 @@ export class SQLiteDatabase {
     return result;
   }
 
-  getTokenEntry(name: string, chainId: number): {row: any, tokenRow: any} {
-    const tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ?').get(getBaseName(name), chainId);
+  getTokenEntry(name: string, chainId: number): { row: any, tokenRow: any } {
+    const tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
 
     if (tokenRow == null) { return { row: null, tokenRow: null }; }
 
@@ -417,6 +442,8 @@ export class SQLiteDatabase {
     // now search for the tokenId
     // @ts-ignore
     const row = this.db.prepare('SELECT name FROM names WHERE tokens_index = ? AND token_id = ?').get(tokenRow.id, tokenId);
+
+    if (!releaseMode) console.log(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(row)}`);
 
     if (row) {
       // @ts-ignore
@@ -632,9 +659,9 @@ export class SQLiteDatabase {
   }
 
   //tokens
-  isBaseNameRegistered(chainId: number, baseName: string): boolean {
-    try { 
-      const row = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ?').get(baseName.toLowerCase(), chainId);
+  isBaseNameRegistered(chainId: number, ensChainId: number, baseName: string): boolean {
+    try {
+      const row = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName.toLowerCase(), chainId, ensChainId);
       if (!releaseMode) console.log(`isBaseNameRegistered ${baseName} ${JSON.stringify(row)}`);
       return (row !== undefined);
     } catch (error) {
@@ -644,9 +671,9 @@ export class SQLiteDatabase {
     }
   }
 
-  getTokenContractRegistered(chainId: number, tokenContract: string): boolean {
+  getTokenContractRegistered(chainId: number, ensChainId: number, tokenContract: string): boolean {
     try {
-      const row = this.db.prepare('SELECT * FROM tokens WHERE chain_id = ? AND token LIKE ?').get(chainId, tokenContract.toLowerCase());
+      const row = this.db.prepare('SELECT * FROM tokens WHERE chain_id = ? AND resolver_chain = ? AND token LIKE ?').get(chainId, ensChainId, tokenContract.toLowerCase());
       if (!releaseMode) console.log(`${tokenContract} ${row} ${row !== undefined}`);
       return (row !== undefined);
     } catch (error) {
@@ -654,20 +681,27 @@ export class SQLiteDatabase {
     }
   }
 
-  registerBaseDomain(baseName: string, tokenContract: string, chainId: number, owner: string) {
+  //(name, tokenContract, numericChainId, numericEnsChainId, applyerAddress);
+  registerBaseDomain(baseName: string, tokenContract: string, chainId: number, ensChainId: number, owner: string) {
 
-    if (this.isBaseNameRegistered(chainId, baseName)) {
+    if (this.isBaseNameRegistered(chainId, ensChainId, baseName)) {
       if (!releaseMode) console.log(`BaseName ${baseName} already registered on the server, cannot create this domain name`);
       return;
     }
 
-    const stmt = this.db.prepare('INSERT INTO tokens (name, token, chain_id, owner) VALUES (?, ?, ?, ?)');
-    stmt.run(baseName, tokenContract, chainId, owner);
+    //check for chain/token clash:
+    if (this.getBaseNameIndex(chainId, tokenContract) != -1) {
+      if (!releaseMode) console.log(`BaseName ${baseName} clash with existing token: this would create ambiguity.`);
+      return;
+    }
+
+    const stmt = this.db.prepare('INSERT INTO tokens (name, token, chain_id, resolver_chain, owner) VALUES (?, ?, ?, ?,?)');
+    stmt.run(baseName, tokenContract, chainId, ensChainId, owner);
   }
 
-  getTokenDetails(chainId: number, baseName: string): BaseNameDef | null {
-    if (!releaseMode) console.log(`getTokenDetails ${chainId} ${baseName}`);
-    const row = this.db.prepare('SELECT token FROM tokens WHERE name = ? AND chain_id = ?').get(baseName.toLowerCase(), chainId);
+  getTokenDetails(chainId: number, ensChainId: number, baseName: string): BaseNameDef | null {
+    if (!releaseMode) console.log(`getTokenDetails ${chainId} ${ensChainId} ${baseName}`);
+    const row = this.db.prepare('SELECT token FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName.toLowerCase(), chainId, ensChainId);
 
     if (row) {
       // @ts-ignore
@@ -687,7 +721,7 @@ export class SQLiteDatabase {
     //first see if it's a legacy value
     if ((coinType & 0x80000000) == 0) {
       //convert using lookup table
-      return ENSIP9[coinType] ?? 0; // nullish operator for undefined result
+      return ENSIP9[coinType] ?? coinType; // just return the chainId if not found in the list
     } else {
       return (0x7fffffff & coinType) >> 0
     }
@@ -726,7 +760,7 @@ export class SQLiteDatabase {
         count1++;
         // @ts-ignore
       } else if (row.token_id === null && count2 < 100) {
-        
+
         // look up address_entry
         // @ts-ignore
         const addressOverrideEntry = this.db.prepare('SELECT * FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, 137);

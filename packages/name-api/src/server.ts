@@ -23,6 +23,7 @@ import fetch from "node-fetch";
 import { pipeline } from 'stream';
 import util from 'util';
 import {FastifyInstance} from "fastify/types/instance";
+import { STANDARD_EIP_1167_IMPLEMENTATION } from "@tokenbound/sdk/dist/src/constants";
 const pump = util.promisify(pipeline);
 
 export const db: SQLiteDatabase = new SQLiteDatabase(
@@ -207,7 +208,7 @@ export async function createServer(){
 	  consoleLog(`FetchedName: ${fetchedName}`);
 	  if (fetchedName && getBaseName(fetchedName) == SMARTCAT_ETH) {
 		// check if TBA matches calc:
-		let { chainId, tokenContract } = db.getTokenDetails(137, SMARTCAT_ETH);
+		let { chainId, tokenContract } = db.getTokenDetails(137, 1, SMARTCAT_ETH);
 		//let { chainId, tokenContract } = db.getTokenLocation(fetchedName);
 		if (tokenContract && tokenId) {
 		  const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
@@ -224,9 +225,9 @@ export async function createServer(){
 	app.get('/name/:chainid/:address/:tokenid', async (request, reply) => {
 		const address = request.params.address;
 		const tokenId = request.params.tokenid;
-		const chainid = request.params.chainid;
-		consoleLog("getName Addr: " + address + " tokenid " + tokenId + " chainid " + chainid);
-		return { result: db.getNameFromToken(chainid, address, tokenId) };
+		const chainId = request.params.chainid;
+		consoleLog("getName Addr: " + address + " tokenid " + tokenId + " chainid " + chainId);
+		return { result: db.getNameFromToken(chainId, address, tokenId) };
 	});
 
 	app.get('/addr/:name/:coinType/:chainId', async (request, reply) => {
@@ -305,7 +306,11 @@ export async function createServer(){
 		const { chainId, tokenContract, name, signature, ensChainId } = request.params;
 
 		const numericChainId: number = Number(chainId);
-		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : 1);
+		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : chainId);
+
+		if (numericChainId != 1 && (numericChainId != numericEnsChainId)) {
+			return reply.status(403).send({ "fail": "Chain mismatch. For development purposes, non mainnet chains can only register tokens on the same chain." });
+		}
 
 		const santisedName = name.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
 
@@ -324,14 +329,19 @@ export async function createServer(){
 		let baseName = getBaseName(name);
 
 		//first check if name already exists
-		if (db.isBaseNameRegistered(chainId, baseName)) {
+		if (db.isBaseNameRegistered(chainId, numericEnsChainId, baseName)) {
 			return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
+		}
+
+		//check for address/chain clash - registering a token with the same chainId and tokenContract on a different ensChain would create ambiguity
+		if (db.getBaseNameIndex(chainId, tokenContract) != -1) {
+			return reply.status(403).send({ "fail": `Base name ${baseName} clash with existing token: this would create ambiguity. Push a transaction on the creation account and try again.` });
 		}
 
 		//consoleLog(`Check DB for tokencontract `);
 
 		// Has this token previously been registered?
-		if (db.getTokenContractRegistered(chainId, tokenContract)) {
+		if (db.getTokenContractRegistered(chainId, numericEnsChainId, tokenContract)) {
 			return reply.status(403).send({ "fail": `Token Contract ${chainId} : ${tokenContract} already registered` });
 		}
 
@@ -374,7 +384,7 @@ export async function createServer(){
 			consoleLog(`OWNS: ${userOwns}`);
 
 			if (userOwns) {
-				db.registerBaseDomain(name, tokenContract, numericChainId, applyerAddress);
+				db.registerBaseDomain(name, tokenContract, numericChainId, numericEnsChainId, applyerAddress);
 				return reply.status(200).send({ "result": "pass" });
 			} else {
 				// @ts-ignore
@@ -394,7 +404,7 @@ export async function createServer(){
 		const { chainId, tokenContract, name, signature, ensChainId } = request.params;
 
 		const numericChainId: number = Number(chainId);
-		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : 1);
+		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : chainId);
 
 		const santisedName = name.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
 
@@ -413,7 +423,7 @@ export async function createServer(){
 		let baseName = getBaseName(name);
 
 		//first check if name already exists
-		if (db.isBaseNameRegistered(chainId, baseName)) {
+		if (db.isBaseNameRegistered(chainId, numericEnsChainId, baseName)) {
 			consoleLog(`Base name ${baseName} already registered`);
 			//return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
 		}
@@ -421,7 +431,7 @@ export async function createServer(){
 		//consoleLog(`Check DB for tokencontract `);
 
 		// Has this token previously been registered?
-		if (db.getTokenContractRegistered(chainId, tokenContract)) {
+		if (db.getTokenContractRegistered(chainId, numericEnsChainId, tokenContract)) {
 			consoleLog(`Token Contract ${chainId} : ${tokenContract} already registered`);
 			//return reply.status(403).send({ "fail": `Token Contract ${chainId} : ${tokenContract} already registered` });
 		}
@@ -493,7 +503,7 @@ export async function createServer(){
 	}
 
 	app.post("/registertext/:chainId/:name/:key/:text/:signature", async (request, reply) => {
-		const { chainId, name, key, text, signature } = request.params;
+		const { chainId, name, key, text, signature, ensChainId } = request.params;
 
 		let { row, tokenRow } = db.getTokenEntry(name, chainId);
 
@@ -587,6 +597,7 @@ export async function createServer(){
 		return processRegistration(request, reply);
 	});
 
+	// can only be mainnet registrations
 	app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress?', async (request, reply) => {
 		return processRegistration(request, reply);
 	});
@@ -594,7 +605,7 @@ export async function createServer(){
 	async function processRegistration(request, reply) {
 		const { chainId, tokenId, name, signature, ensAddress } = request.params;
 		const numericChainId = Number(chainId);
-		const numericEnsChainId = request.params.ensChainId ? Number(request.params.ensChainId) : 0;
+		const numericEnsChainId = request.params.ensChainId ? Number(request.params.ensChainId) : numericChainId; //use same ENS chain as token if not overriden
 
 		consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
 
@@ -604,11 +615,11 @@ export async function createServer(){
 
 		let baseName = getBaseName(name);
 		consoleLog(`BaseName: ${baseName}`);
-		if (!db.isBaseNameRegistered(chainId, baseName)) {
+		if (!db.isBaseNameRegistered(chainId, numericEnsChainId, baseName)) {
 			return reply.status(403).send({ "fail": `Basename ${baseName} not registered on the server, cannot create this domain name` });
 		}
 
-		let { tokenContract } = db.getTokenDetails(chainId, baseName);
+		let { tokenContract } = db.getTokenDetails(chainId, numericEnsChainId, baseName);
 		consoleLog(`Register token ${tokenContract}`);
 
 		if (!tokenContract) {
@@ -621,8 +632,8 @@ export async function createServer(){
 		}
 
 		//Have they already registered this token?
-		const currentName = db.getNameFromToken(chainid, tokenContract, tokenId);
-		if (currentName == null) {
+		const currentName = db.getNameFromToken(chainId, tokenContract, tokenId);
+		if (currentName != null) {
 			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
 

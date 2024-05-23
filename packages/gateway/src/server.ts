@@ -138,14 +138,17 @@ export function makeServer(signer: ethers.utils.SigningKey, dataPath: string, tt
         var chainIdToUse: number;
 
         try {
+          console.log(`Request1: ${resolverAddr}`);
           let bytesArray = ethers.utils.arrayify(request?.data);
           const payloadData = bytesArray.slice(4);
           const types = ['bytes', 'bytes', 'uint256'];
           const [, , chainId] = ethers.utils.defaultAbiCoder.decode(types, payloadData);
+          console.log(`Request2: ${resolverAddr} ${chainId}`);
           //console.log(`${chainId}`);
           chainIdToUse = chainId;
         } catch (e) {
           //is this coming from the SmartCats mainnet resolver?
+          console.log(`Request3: ${resolverAddr}`);
           if (resolverAddr.toLowerCase() === SMARTCATS_RESOLVER.toLowerCase()) {
             chainIdToUse = 1; // Mainnet smartcats resolver - this contract doesn't report chainId
           } else {

@@ -72,14 +72,14 @@ contract OffchainResolver is IExtendedResolver, SupportsInterface, Ownable {
     }
 
 
-    function copyBytes(bytes memory source) public pure returns (bytes memory) {
+    /*function copyBytes(bytes memory source) public pure returns (bytes memory) {
         bytes memory destination = new bytes(source.length + 1);
         for (uint i = 0; i < source.length; i++) {
             destination[i] = source[i];
         }
         destination[source.length] = 0x1b;
         return destination;
-    }
+    }*/
 
     /**
      * Callback used by CCIP read compatible clients to verify and parse the response.
