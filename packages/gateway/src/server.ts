@@ -87,6 +87,7 @@ async function resolve(dataPath: string, name: string, coinType: number, ttlVal:
     //console.log(`${dataPath}/addr/${name}/${coinType}/${chainId}`);
     const addrReq = await fetch(`${dataPath}/addr/${name}/${coinType}/${chainId}`);
     const resp = await addrReq.json();
+    //console.log(`result: ${resp.addr} ttl:${ttlVal}`);
     return { result: [resp.addr], ttl:ttlVal };
   } catch (error) {
     console.log('error', error);
@@ -133,22 +134,22 @@ export function makeServer(signer: ethers.utils.SigningKey, dataPath: string, tt
         const name = decodeDnsName(Buffer.from(encodedName.slice(2), 'hex'));
         const resolverAddr: string = request.to.toString();
         //console.log(`name: ${name} dataPath ${dataPath} ${data} ${request?.data}`);
-        console.log(`Request: ${resolverAddr}`);
+        //console.log(`Request: ${resolverAddr}`);
 
         var chainIdToUse: number;
 
         try {
-          console.log(`Request1: ${resolverAddr}`);
+          //console.log(`Request1: ${resolverAddr}`);
           let bytesArray = ethers.utils.arrayify(request?.data);
           const payloadData = bytesArray.slice(4);
           const types = ['bytes', 'bytes', 'uint256'];
           const [, , chainId] = ethers.utils.defaultAbiCoder.decode(types, payloadData);
-          console.log(`Request2: ${resolverAddr} ${chainId}`);
+          //console.log(`Request2: ${resolverAddr} ${chainId}`);
           //console.log(`${chainId}`);
           chainIdToUse = chainId;
         } catch (e) {
           //is this coming from the SmartCats mainnet resolver?
-          console.log(`Request3: ${resolverAddr}`);
+          //console.log(`Request3: ${resolverAddr}`);
           if (resolverAddr.toLowerCase() === SMARTCATS_RESOLVER.toLowerCase()) {
             chainIdToUse = 1; // Mainnet smartcats resolver - this contract doesn't report chainId
           } else {

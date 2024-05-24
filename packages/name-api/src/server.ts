@@ -12,17 +12,17 @@ import {
 } from "./constants";
 import fastify from "fastify";
 import fs from "fs";
-import {getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain} from "./resolve";
-import {isIPFS, tokenAvatarRequest} from "./tokenDiscovery";
-import {getTokenBoundAccount} from "./tokenBound";
-import {ethers, ZeroAddress} from "ethers";
-import {SQLiteDatabase, SMARTCAT_ETH, SMARTCAT_TOKEN} from "./sqlite";
+import { getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain } from "./resolve";
+import { isIPFS, tokenAvatarRequest } from "./tokenDiscovery";
+import { getTokenBoundAccount } from "./tokenBound";
+import { ethers, ZeroAddress } from "ethers";
+import { SQLiteDatabase, SMARTCAT_ETH, SMARTCAT_TOKEN } from "./sqlite";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
 import { pipeline } from 'stream';
 import util from 'util';
-import {FastifyInstance} from "fastify/types/instance";
+import { FastifyInstance } from "fastify/types/instance";
 import { STANDARD_EIP_1167_IMPLEMENTATION } from "@tokenbound/sdk/dist/src/constants";
 const pump = util.promisify(pipeline);
 
@@ -72,7 +72,7 @@ function consoleLog(msg: string) {
 	}
 }
 
-export async function createServer(){
+export async function createServer() {
 
 	let app: FastifyInstance;
 	let lastError: string[] = [];
@@ -154,7 +154,7 @@ export async function createServer(){
 		const contenthash = db.contenthash(chainId, name);
 		const hexContent = ipfsHashToHex(contenthash);
 		consoleLog(`Contenthash ${name} ${chainId} ${contenthash} ${hexContent}`);
-		
+
 		return hexContent;
 	});
 
@@ -178,7 +178,7 @@ export async function createServer(){
 	app.get('/tokenId/:chainId/:name', async (request, reply) => {
 		const name = request.params.name;
 		const chainId = request.params.chainId;
-		return { result: db.getTokenIdFromName(chainId, name)};
+		return { result: db.getTokenIdFromName(chainId, name) };
 	});
 
 	app.get('/image/:name/:chainId', async (request, reply) => {
@@ -199,27 +199,27 @@ export async function createServer(){
 	// Only for thesmartcats; use name/:chainid/:address/:tokenid instead
 	// address is the TBA address
 	app.get('/catname/:address/:tokenid?', async (request, reply) => {
-	  const address = request.params.address;
-	  const tokenId = request.params.tokenid;
-	  // const chainId = request.params.chainid;
-	  //consoleLog("Addr2: " + address + " tokenid " + tokenId);
-	  
-	  const fetchedName = db.getNameFromAddress(address, tokenId);
-	  consoleLog(`FetchedName: ${fetchedName}`);
-	  if (fetchedName && getBaseName(fetchedName) == SMARTCAT_ETH) {
-		// check if TBA matches calc:
-		let { chainId, tokenContract } = db.getTokenDetails(137, 1, SMARTCAT_ETH);
-		//let { chainId, tokenContract } = db.getTokenLocation(fetchedName);
-		if (tokenContract && tokenId) {
-		  const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
-		  //consoleLog(`fromUser: ${address} calc:${tbaAccount} ${tokenId}`);
-		  if (tbaAccount.toLowerCase() == address.toLowerCase()) {
-			db.updateTokenId(chainId, fetchedName, tokenId);  //chainId: number, name: string, tokenId: number
-		  }
-		}
-	  }
+		const address = request.params.address;
+		const tokenId = request.params.tokenid;
+		// const chainId = request.params.chainid;
+		//consoleLog("Addr2: " + address + " tokenid " + tokenId);
 
-	  return { result: `${fetchedName}` };
+		const fetchedName = db.getNameFromAddress(address, tokenId);
+		consoleLog(`FetchedName: ${fetchedName}`);
+		if (fetchedName && getBaseName(fetchedName) == SMARTCAT_ETH) {
+			// check if TBA matches calc:
+			let { chainId, tokenContract } = db.getTokenDetails(137, 1, SMARTCAT_ETH);
+			//let { chainId, tokenContract } = db.getTokenLocation(fetchedName);
+			if (tokenContract && tokenId) {
+				const tbaAccount = getTokenBoundAccount(chainId, tokenContract, tokenId);
+				//consoleLog(`fromUser: ${address} calc:${tbaAccount} ${tokenId}`);
+				if (tbaAccount.toLowerCase() == address.toLowerCase()) {
+					db.updateTokenId(chainId, fetchedName, tokenId);  //chainId: number, name: string, tokenId: number
+				}
+			}
+		}
+
+		return { result: `${fetchedName}` };
 	});
 
 	app.get('/name/:chainid/:address/:tokenid', async (request, reply) => {
@@ -238,6 +238,7 @@ export async function createServer(){
 			return { addr: RESOLVE_FAKE_ADDRESS }; //If we get to this point, then the onchain part of the resolver is working correctly
 		}
 		addCointTypeCheck(`${name} Attempt to resolve: ${coinType}`);
+		consoleLog(`${name} Attempt to resolve: ${chainId} ${coinType}`);
 		return db.addr(chainId, name, coinType);
 	});
 
@@ -333,16 +334,16 @@ export async function createServer(){
 			return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
 		}
 
-		//check for address/chain clash - registering a token with the same chainId and tokenContract on a different ensChain would create ambiguity
-		if (db.getBaseNameIndex(chainId, tokenContract) != -1) {
-			return reply.status(403).send({ "fail": `Base name ${baseName} clash with existing token: this would create ambiguity. Push a transaction on the creation account and try again.` });
-		}
-
 		//consoleLog(`Check DB for tokencontract `);
 
 		// Has this token previously been registered?
 		if (db.getTokenContractRegistered(chainId, numericEnsChainId, tokenContract)) {
 			return reply.status(403).send({ "fail": `Token Contract ${chainId} : ${tokenContract} already registered` });
+		}
+
+		//check for address/chain clash - registering a token with the same chainId and tokenContract on a different ensChain would create ambiguity
+		if (db.getBaseNameIndex(chainId, tokenContract) != -1) {
+			return reply.status(403).send({ "fail": `Base name ${baseName} clash with existing token: this would create ambiguity. Push a transaction on the creation account and try again.` });
 		}
 
 		consoleLog(`Check resolver ${name} (${baseName})`);
@@ -377,8 +378,8 @@ export async function createServer(){
 
 				userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
 					: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
-							// TODO: If no owner, then require a approval signature to create the domain name
-							// Note: We don't have resources to implement this yet
+				// TODO: If no owner, then require a approval signature to create the domain name
+				// Note: We don't have resources to implement this yet
 			}
 
 			consoleLog(`OWNS: ${userOwns}`);
@@ -468,8 +469,8 @@ export async function createServer(){
 
 				userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
 					: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
-							// TODO: If no owner, then require a approval signature to create the domain name
-							// Note: We don't have resources to implement this yet
+				// TODO: If no owner, then require a approval signature to create the domain name
+				// Note: We don't have resources to implement this yet
 			}
 
 			consoleLog(`OWNS: ${userOwns}`);
@@ -679,10 +680,10 @@ async function getTokenImage(chainId: number, name: string, tokenId: number) {
 	consoleLog(`getTokenImage ${chainId} ${name} ${tokenId}`);
 	const { tokenRow } = db.getTokenEntry(name, chainId);
 
-	consoleLog(`${chainId} ${tokenRow.token}`);
+	consoleLog(`${chainId} ${tokenRow.chain_id} ${tokenRow.token}`);
 
 	if (tokenRow && tokenRow.token) {
-		const tokenData = await tokenAvatarRequest(chainId, tokenRow.token, tokenId);
+		const tokenData = await tokenAvatarRequest(tokenRow.chain_id, tokenRow.token, tokenId);
 		return tokenData;
 	} else {
 		return "";
@@ -841,8 +842,7 @@ function recoverTextAddress(name: string, chainId: number, key: string, text: st
 
 async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddress: string, tokenId: string): Promise<boolean> {
 
-	if (!chainId)
-	{
+	if (!chainId) {
 		throw new Error("Missing chain config");
 	}
 

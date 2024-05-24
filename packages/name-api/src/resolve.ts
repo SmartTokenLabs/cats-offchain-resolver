@@ -12,6 +12,17 @@ type ChainDetail = {
     chainId: number;
 };
 
+export const CHAIN_ID: Record<string, number> = {
+    "mainnet": 1,
+    "polygon": 137,
+    "optimism": 10,
+    "arbitrum": 42161,
+    "sepolia": 11155111,
+    "mantle": 5000,
+    "mantle-testnet": 5003,
+    "holesky": 17000,
+};
+
 const CHAIN_DETAILS: Record<number, ChainDetail> = {
     1: { name: "mainnet", RPCurl: `https://mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 1 },
     5: { name: "goerli", RPCurl: `https://goerli.infura.io/v3/${INFURA_KEY}`, chainId: 5 },

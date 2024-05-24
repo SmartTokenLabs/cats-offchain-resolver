@@ -1,5 +1,5 @@
 import BetterSqlite3 from 'better-sqlite3';
-import { getBaseName, getPrimaryName } from "./resolve";
+import { getBaseName, getPrimaryName, CHAIN_ID } from "./resolve";
 import { getTokenBoundAccount } from "./tokenBound";
 import { RELEASE_MODE } from "./constants";
 
@@ -123,7 +123,7 @@ export class SQLiteDatabase {
 
       if (smartcatsIndex != -1) {
         // @ts-ignore
-        this.db.prepare('UPDATE tokens SET resolver_chain = 1 WHERE id = ?').run(smartcatsIndex);
+        this.db.prepare('UPDATE tokens SET resolver_chain = ? WHERE id = ?').run(CHAIN_ID.mainnet, smartcatsIndex);
       }
     }
 
@@ -137,8 +137,8 @@ export class SQLiteDatabase {
     // add thesmartcats.eth entry if required
     if (smartcatsIndex == -1) {
       console.log(`Adding smartcats`);
-      this.registerBaseDomain(SMARTCAT_ETH, SMARTCAT_TOKEN, 137, 1, SMARTCAT_TOKEN_OWNER);
-      smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
+      this.registerBaseDomain(SMARTCAT_ETH, SMARTCAT_TOKEN, CHAIN_ID.polygon, 1, SMARTCAT_TOKEN_OWNER);
+      smartcatsIndex = this.getBaseNameIndex(CHAIN_ID.polygon, SMARTCAT_TOKEN);
     }
 
     //get the index of smartcats.eth
@@ -332,9 +332,14 @@ export class SQLiteDatabase {
     // @ts-ignore
     const tokenChainId = tokenRow.chain_id;
 
-    const coinChainId = this.convertCoinTypeToEVMChainId(coinType);
+    var coinChainId = this.convertCoinTypeToEVMChainId(coinType);
 
-    console.log(`addr ${name} ${coinType} ${tokenId} ${tokenContract} ${tokenChainId} ${coinChainId}`);
+    //testnets should return address with a default query
+    if (coinChainId == CHAIN_ID.mainnet && chainId != CHAIN_ID.mainnet) {
+      coinChainId = chainId; //Note this will match the tokenChainId if the setup is correct (ie during registration the chainId was given correctly. Note that registration checks the validity of the ENS setup).
+    }
+
+    if (!releaseMode) console.log(`addr ${name} ${coinType} ${tokenId} ${tokenContract} ${chainId} ${tokenChainId} ${coinChainId}`);
 
     // @ts-ignore
     const addressOverride = this.db.prepare('SELECT address FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, coinChainId); //use EVM chainId in database
@@ -346,7 +351,7 @@ export class SQLiteDatabase {
       return { addr: addressOverride.address };
     } else if (tokenChainId == coinChainId) {
       //calculate the 6551 address for the chainId of the token
-      //console.log("TBA");
+      if (!releaseMode) console.log("TBA");
       return { addr: getTokenBoundAccount(coinChainId, tokenContract, tokenId) };
     } else {
       //console.log("ZERO ADDRESS");
