@@ -39,6 +39,7 @@ const provider = new ethers.providers.JsonRpcProvider(options.provider, {
   ensAddress,
 });
 
+// @ts-ignore
 const provider2 = new ethers.providers.JsonRpcProvider(`https://mainnet.infura.io/v3/${INFURA_KEY}`, {
   chainId: chainIdMain,
   name: 'mainnet',
@@ -110,6 +111,34 @@ const decodeAbi = [
   }
 ];
 
+//@ts-ignore
+const decodeCoin = [
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "node",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "coinType",
+        "type": "uint256"
+      }
+    ],
+    "name": "addr",
+    "outputs": [
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+];
+
 // @ts-ignore
 async function postUrl(url: string): Promise<string> {
   try {
@@ -143,8 +172,7 @@ async function postUrl(url: string): Promise<string> {
   // @ts-ignore
   const wallet = new ethers.Wallet(pk);
 
-<<<<<<< Updated upstream
-=======
+  /*
   let resolverM = await provider.getResolver(`thesmartcats.eth`);
   console.log(`Main Resolver: ${JSON.stringify(resolverM)} ${resolverM!!.address}`);
 
@@ -154,7 +182,7 @@ async function postUrl(url: string): Promise<string> {
 
     
 
-  const resolverAddress = `0x6a844646443f29dF2Fd47F92E3520b61F3FC0754`;
+  const resolverAddress: string = resolverM!!.address;// `0x6a844646443f29dF2Fd47F92E3520b61F3FC0754`;
   const namehash2 = ethers.utils.namehash(`thesmartcats.eth`);
   const dnsEncode = ethers.utils.dnsEncode(`thesmartcats.eth`);
   const funcEncode = "0x3b3b57de" + namehash2.substring(2);
@@ -175,9 +203,8 @@ async function postUrl(url: string): Promise<string> {
     // @ts-ignore
     const decoded = iface.decodeFunctionData('OffchainLookup', error.data);
     console.log(`Decoded: ${JSON.stringify(decoded)} ${decoded.urls[0]}`);
-  }
+  }*/
 
->>>>>>> Stashed changes
   //let gatewayServer = "http://192.168.50.206";
   let gatewayServer = "http://44.217.178.162";
   // @ts-ignore
@@ -190,37 +217,23 @@ async function postUrl(url: string): Promise<string> {
   //let tokenAddr = "0x4ffb1b3c2464644ba3436de3fc81a5d79cdf5760";
   // @ts-ignore
   let catsTokenAddr = "0xa04664f6191d9a65f5f48c6f9d6dd81cb636e65c";
-<<<<<<< Updated upstream
-=======
-  //let catsTokenAddrSep = "0xa532D3c016aA0B44b7228aCcd701A5F03112CD22";
->>>>>>> Stashed changes
+  // @ts-ignore
+  let catsTokenAddrSep = "0xa532D3c016aA0B44b7228aCcd701A5F03112CD22";
+  //let botanyBayAddr = "0xb6bc327900322466b3f950abb591bb2803338599";
   // @ts-ignore
   let chainId = 11155111;
   // @ts-ignore
-  let tokenId = 5;
+  let tokenId = 9;
   let tokenName = name;
   // @ts-ignore
   let tokenIdName = "garfield";
 
-<<<<<<< Updated upstream
-  const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
-=======
-  //const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
-  //const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddrSep} on chain ${chainId}`;
   /*const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddrSep} on chain ${chainId}`;
->>>>>>> Stashed changes
-
   console.log(`MSG: ${message}`);
 
   const signature = await wallet.signMessage(message);
   console.log('Signature: ', signature);
-
-<<<<<<< Updated upstream
-  let callUrl = `${registryAddress}/registertoken/${chainId}/${catsTokenAddr}/${tokenName}/${signature}/${chainId}`;///${chainId}
-=======
-  let callUrl = `${registryAddress}/testregistertoken/${chainId}/${catsTokenAddrSep}/${tokenName}/${signature}/${chainId}`;///${chainId}
-  //let callUrl = `${registryAddress}/registertoken/${chainId}/${catsTokenAddrSep}/thesmartcats.eth/${signature}/${chainId}`;///${chainId}
->>>>>>> Stashed changes
+  let callUrl = `${registryAddress}/registertoken/${chainId}/${catsTokenAddrSep}/${name}/${signature}/${chainId}`;///${chainId}
 
   console.log(`CALL: ${callUrl}`);
 
@@ -228,22 +241,43 @@ async function postUrl(url: string): Promise<string> {
 
   console.log(`RSP: ${response}`);
 
-<<<<<<< Updated upstream
+  let registerMsg = `Registering your tokenId ${tokenId} name to ${tokenIdName}.${tokenName} on chain ${chainId}`;
+  const signature2 = await wallet.signMessage(registerMsg);
+  console.log('Signature: ', signature2);
+  let callUrl2 = `${registryAddress}/register/${chainId}/${tokenIdName}.${tokenName}/${tokenId}/${signature2}`;
+  console.log(`CALL: ${callUrl2}`);
+  const response2 = await postUrl(callUrl2);
 
-  // @ts-ignore
-  let tokenIdName = "max";
-=======
+  console.log(`RSP: ${response2}`);*/
+
+  /*
+  //const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddr}`;
+  //const message = `Attempting to register domain ${tokenName} name to ${catsTokenAddrSep} on chain ${chainId}`;
+  const message = `Attempting to register domain ${tokenName} name to ${botanyBayAddr} on chain ${chainId}`;
+
+  console.log(`MSG: ${message}`);
+
+  const signature = await wallet.signMessage(message);
+  console.log('Signature: ', signature);
+
+  //let callUrl = `${registryAddress}/testregistertoken/${chainId}/${catsTokenAddrSep}/${tokenName}/${signature}/${chainId}`;///${chainId}
+  //let callUrl = `${registryAddress}/registertoken/${chainId}/${catsTokenAddrSep}/thesmartcats.eth/${signature}/${chainId}`;///${chainId}
+  let callUrl = `${registryAddress}/registertoken/${chainId}/${botanyBayAddr}/esp32.eth/${signature}/${chainId}`;///${chainId}
+
+  console.log(`CALL: ${callUrl}`);
+
+  const response = await postUrl(callUrl);
+
+  console.log(`RSP: ${response}`);
+
+  */
+
   
->>>>>>> Stashed changes
 
   // 2. Create 6551 name
   // /register/:chainId/:tokenContract/:tokenId/:name/:signature 
   //Registering your tokenId 5 name to max.bob.xnft.eth
-<<<<<<< Updated upstream
-  let registerMsg = `Registering your tokenId ${tokenId} name to ${tokenIdName}.${tokenName}`;
-=======
   /*let registerMsg = `Registering your tokenId ${tokenId} name to ${tokenIdName}.${tokenName} on chain ${chainId}`;
->>>>>>> Stashed changes
   const signature2 = await wallet.signMessage(registerMsg);
   console.log('Signature: ', signature2);
   let callUrl2 = `${registryAddress}/register/${chainId}/${tokenIdName}.${tokenName}/${tokenId}/${signature2}`;
@@ -276,21 +310,30 @@ async function postUrl(url: string): Promise<string> {
     let resolver = await provider.getResolver(`${tokenIdName}.${tokenName}`);
   console.log(`Resolver: ${JSON.stringify(resolver)}`);
 
-  let ethMainnetAddress = await resolver!!.getAddress();
+  let ethMainnetAddress = "0x0000000000000000000000000000000000000000"; //await resolver!!.getAddress();
+  let ethMainnetAddress2 = "0x0000000000000000000000000000000000000000";
 
-  console.log(`ADDR: ${ethMainnetAddress}`);
+  try {
+    ethMainnetAddress2 = await resolver!!.getAddress(700);
+    console.log(`ADDR: ${ethMainnetAddress2}`);
+  } catch (error) {
+    console.log(`Error: ${error}`);
+  }
 
-  //resolve image
-  let avatarUrl = await resolver!!.getAvatar();
-  console.log(`AVATAR: ${avatarUrl} ${JSON.stringify(avatarUrl)}`);
-
-  console.log(`AVATAR: ${JSON.stringify(avatarUrl)}`);
+  console.log(`ADDR: ${ethMainnetAddress} ${ethMainnetAddress2}`);
 
   let addr = await resolve(`${tokenIdName}.${tokenName}`, resolver!!.address);
   console.log(`ADDR: ${addr}`);
 
+  //resolve image
+  let avatarUrl = await resolver!!.getAvatar();
+  console.log(`AVATAR: ${avatarUrl!.url} ${JSON.stringify(avatarUrl)}`);
+
+  console.log(`AVATAR: ${JSON.stringify(avatarUrl)}`);
+
+
   //first try setting text of existing upload
-  let ipfsHash = "QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g";
+  /*let ipfsHash = "QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g";
   let registerMsg3 = `Attempting to update storage to domain ${tokenIdName}.${tokenName} on ${chainId} with hash ${ipfsHash}`;
   //Attempting to update storage to domain max.bob.xnft.eth on 11155111 with hash QmSej6ZLpoa44CmAwHfkpXG1MKqGuwQAvem63sQR3iE89g
   console.log(`${registerMsg3}`);
@@ -319,12 +362,7 @@ async function postUrl(url: string): Promise<string> {
   console.log(`IPFS Set: ${response4}`);
 
   //now resolve Avatar
-<<<<<<< Updated upstream
-  let resolver = await provider.getResolver(`${tokenIdName}.${tokenName}`);
-
-=======
   //let resolver = await provider.getResolver(`${tokenIdName}.${tokenName}`);
->>>>>>> Stashed changes
   //console.log(`Resolver: ${JSON.stringify(resolver)}`);
 
   //let ethMainnetAddress = await resolver!!.getAddress();
@@ -378,9 +416,15 @@ async function postUrl(url: string): Promise<string> {
   async function resolve(name: string, resolverAddress: string): Promise<string> {
     const namehash = ethers.utils.namehash(name);
     const dnsEncode = ethers.utils.dnsEncode(name);
+
+    //const hexBytes = await this._fetchBytes("0xf1cb7e06", bytes32ify(coinType));
     const funcEncode = "0x3b3b57de" + namehash.substring(2);
 
+    // for polygon 3c6 = 966
+    const funcEncode2 = "0xf1cb7e0672a398cc5f361dbf052bd2f09ac6db3b6ea132226e15a223e405a867cf5e3abd00000000000000000000000000000000000000000000000000000000000003c6";
+
     console.log(`DNS: ${dnsEncode}, ${funcEncode}`);
+    console.log(`DNS2: ${dnsEncode}, ${funcEncode2}`);
 
     const catResolver = new ethers.Contract(resolverAddress, [
       'function resolve(bytes name, bytes data) view returns (bytes)',
@@ -389,7 +433,7 @@ async function postUrl(url: string): Promise<string> {
 
     //call, get error
     try {
-      const resolverTx = await catResolver.resolve(dnsEncode, funcEncode);
+      const resolverTx = await catResolver.resolve(dnsEncode, funcEncode2);
       console.log(resolverTx);
     } catch (error) {
       //break down the data
@@ -400,6 +444,11 @@ async function postUrl(url: string): Promise<string> {
       https://ens-gate.main.smartlayer.network/{sender}/{data}.json
       ["0x6a844646443f29dF2Fd47F92E3520b61F3FC0754"]
       0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      */
+
+      /*
+      {"data":"0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000664c940800000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004077b3c984bbad74909610001eb064fb4212d0551fde2e48db512a51af74bc79d1d9b955cbc7a10058eda6f1cd1a58b9693dc6c5de1dca64affea5e02bd72c7829"}
+      {"data":"0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000664d567400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000002975119d0acced42e69a7ae2395a453ae88817d300000000000000000000000000000000000000000000000000000000000000403950c0c4c47189aafc125696402622e17dc11b2874f72b9246673919557c7ad123312caa0b8fde80a43989a50467d7072567688ad722b905cd75b3f72c8da3f8"}
       */
 
       //0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000664c47f800000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040dc513639673d3fe5de6f2e017afc30445ed405ab83c79abcff8e4492c9b6eef0d072089a7409be6b86d47125399ea297fae359d14e75b54d660c17355c1aa8e4
@@ -427,13 +476,25 @@ async function postUrl(url: string): Promise<string> {
           const proofReturn = await catResolver.resolveWithProof(proofResponse, extraData);
           console.log(`Proof Return: ${proofReturn}`);
 
-          console.log("Len: " + proofReturn.length);
+          //if parsing a coinType return:
+          const coinTypeIface = new ethers.utils.Interface(decodeCoin);
+          const decodedData = coinTypeIface.decodeFunctionResult('addr', proofReturn);
+
+          console.log(`Decoded Data: ${JSON.stringify(decodedData)}`);
+          
+          const truncated = decodedData[0];
+
+          console.log("Truncated: " + truncated);
+      
+
+
+          /*console.log("Len: " + proofReturn.length);
           var truncated = proofReturn;
           if (proofReturn.length > 42) {
             truncated = "0x" + proofReturn.substring(proofReturn.length - 40);
           }
 
-          console.log("Truncated: " + truncated);
+          console.log("Truncated: " + truncated);*/
 
           return ethers.utils.getAddress(truncated);
         }
