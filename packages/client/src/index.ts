@@ -322,7 +322,7 @@ async function postUrl(url: string): Promise<string> {
 
   console.log(`ADDR: ${ethMainnetAddress} ${ethMainnetAddress2}`);
 
-  let addr = await resolve(`${tokenIdName}.${tokenName}`, resolver!!.address);
+  let addr = await resolveCoinType(`${tokenIdName}.${tokenName}`, 966, resolver!!.address); //resolve Polygon
   console.log(`ADDR: ${addr}`);
 
   //resolve image
@@ -412,8 +412,70 @@ async function postUrl(url: string): Promise<string> {
   //console.log(`ADDR: ${addr}`);
 
 
+  
   // @ts-ignore
   async function resolve(name: string, resolverAddress: string): Promise<string> {
+    const namehash = ethers.utils.namehash(name);
+    const dnsEncode = ethers.utils.dnsEncode(name);
+    const funcEncode = "0x3b3b57de" + namehash.substring(2);
+
+    console.log(`DNS: ${dnsEncode}, ${funcEncode}`);
+
+    const catResolver = new ethers.Contract(resolverAddress, [
+      'function resolve(bytes name, bytes data) view returns (bytes)',
+      'function resolveWithProof(bytes calldata response, bytes calldata extraData) external view returns(bytes memory)'
+    ], provider);
+
+    //call, get error
+    try {
+      const resolverTx = await catResolver.resolve(dnsEncode, funcEncode);
+      console.log(resolverTx);
+    } catch (error) {
+      //break down the data
+      const iface = new ethers.utils.Interface(returnAbi);
+      const decoded = iface.decodeFunctionData('OffchainLookup', error.data);
+
+      //format URL:
+      const callUrl = decoded.urls[0].replace('{sender}', decoded.sender).replace('{data}', decoded.callData);
+
+      console.log(`CALLURL: ${callUrl}`);
+
+      try {
+        const response = await fetch(callUrl);
+
+        if (response.ok) {
+          const data = await response.json();
+
+          //response1
+          const proofResponse = data.data;
+          const extraData = decoded.extraData;
+
+          console.log(`Proof Response: ${proofResponse}`);
+          console.log(`Extra: ${extraData}`);
+          //now call proof
+          const proofReturn = await catResolver.resolveWithProof(proofResponse, extraData);
+          console.log(`Proof Return: ${proofReturn}`);
+
+          console.log("Len: " + proofReturn.length);
+          var truncated = proofReturn;
+          if (proofReturn.length > 42) {
+            truncated = "0x" + proofReturn.substring(proofReturn.length - 40);
+          }
+
+          console.log("Truncated: " + truncated);
+
+          return ethers.utils.getAddress(truncated);
+        }
+      } catch (callError) {
+        // nop, expected
+      }
+    }
+
+    return ethers.constants.AddressZero;
+  }
+
+  // @ts-ignore
+  async function resolveCoinType(name: string, coinType: number, resolverAddress: string): Promise<string> {
     const namehash = ethers.utils.namehash(name);
     const dnsEncode = ethers.utils.dnsEncode(name);
 
@@ -421,7 +483,9 @@ async function postUrl(url: string): Promise<string> {
     const funcEncode = "0x3b3b57de" + namehash.substring(2);
 
     // for polygon 3c6 = 966
-    const funcEncode2 = "0xf1cb7e0672a398cc5f361dbf052bd2f09ac6db3b6ea132226e15a223e405a867cf5e3abd00000000000000000000000000000000000000000000000000000000000003c6";
+    const hexValue = ethers.utils.hexlify(coinType);
+    const paddedHexValue = ethers.utils.hexZeroPad(hexValue, 32).substring(2);
+    const funcEncode2 = "0xf1cb7e0672a398cc5f361dbf052bd2f09ac6db3b6ea132226e15a223e405a867cf5e3abd" + paddedHexValue;
 
     console.log(`DNS: ${dnsEncode}, ${funcEncode}`);
     console.log(`DNS2: ${dnsEncode}, ${funcEncode2}`);
@@ -439,21 +503,6 @@ async function postUrl(url: string): Promise<string> {
       //break down the data
       const iface = new ethers.utils.Interface(returnAbi);
       const decoded = iface.decodeFunctionData('OffchainLookup', error.data);
-
-      /*
-      https://ens-gate.main.smartlayer.network/{sender}/{data}.json
-      ["0x6a844646443f29dF2Fd47F92E3520b61F3FC0754"]
-      0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-      */
-
-      /*
-      {"data":"0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000664c940800000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004077b3c984bbad74909610001eb064fb4212d0551fde2e48db512a51af74bc79d1d9b955cbc7a10058eda6f1cd1a58b9693dc6c5de1dca64affea5e02bd72c7829"}
-      {"data":"0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000664d567400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000002975119d0acced42e69a7ae2395a453ae88817d300000000000000000000000000000000000000000000000000000000000000403950c0c4c47189aafc125696402622e17dc11b2874f72b9246673919557c7ad123312caa0b8fde80a43989a50467d7072567688ad722b905cd75b3f72c8da3f8"}
-      */
-
-      //0x000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000664c47f800000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040dc513639673d3fe5de6f2e017afc30445ed405ab83c79abcff8e4492c9b6eef0d072089a7409be6b86d47125399ea297fae359d14e75b54d660c17355c1aa8e4
-      //0x00000000000000000000000000000000000000000000000000000000000000400000000000000000000000006a844646443f29df2fd47f92e3520b61f3fc075400000000000000000000000000000000000000000000000000000000000000e49061b92300000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000001b086761726669656c640c746865736d617274636174730365746800000000000000000000000000000000000000000000000000000000000000000000000000243b3b57de72a398cc5f361dbf052bd2f09ac6db3b6ea132226e15a223e405a867cf5e3abd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-      
 
       //format URL:
       const callUrl = decoded.urls[0].replace('{sender}', decoded.sender).replace('{data}', decoded.callData);
@@ -482,21 +531,7 @@ async function postUrl(url: string): Promise<string> {
 
           console.log(`Decoded Data: ${JSON.stringify(decodedData)}`);
           
-          const truncated = decodedData[0];
-
-          console.log("Truncated: " + truncated);
-      
-
-
-          /*console.log("Len: " + proofReturn.length);
-          var truncated = proofReturn;
-          if (proofReturn.length > 42) {
-            truncated = "0x" + proofReturn.substring(proofReturn.length - 40);
-          }
-
-          console.log("Truncated: " + truncated);*/
-
-          return ethers.utils.getAddress(truncated);
+          return ethers.utils.getAddress(decodedData[0]);
         }
       } catch (callError) {
         // nop, expected
@@ -593,5 +628,3 @@ async function postUrl(url: string): Promise<string> {
 }
 
 )();
-
-
