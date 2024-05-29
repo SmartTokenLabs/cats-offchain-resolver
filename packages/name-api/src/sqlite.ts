@@ -333,12 +333,19 @@ export class SQLiteDatabase {
   addr(chainId: number, name: string, coinType: number) {
     //first get the base domain entry (ie catcollection.xnft.eth)
     const { row, tokenRow } = this.getTokenEntry(name, chainId);
+
     var coinChainId = this.convertCoinTypeToEVMChainId(coinType);
+    //testnets should return address with a default query
+    if (coinChainId == CHAIN_ID.mainnet && chainId != CHAIN_ID.mainnet) {
+      coinChainId = chainId; //Note this will match the tokenChainId if the setup is correct (ie during registration the chainId was given correctly. Note that registration checks the validity of the ENS setup).
+    }
 
     const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name, coinChainId, chainId);
 
     if (nftTokenRow) {
+      // @ts-ignore
       consoleLog(`nftTokenRow: ${JSON.stringify(nftTokenRow)} TBA`);
+      //return the address from the NFT token
       // @ts-ignore
       return { addr: getTokenBoundAccount(coinChainId, nftTokenRow.token, nftTokenRow.token_id) };
     }
@@ -358,11 +365,6 @@ export class SQLiteDatabase {
 
     // @ts-ignore
     const tokenChainId = tokenRow.chain_id;
-
-    //testnets should return address with a default query
-    if (coinChainId == CHAIN_ID.mainnet && chainId != CHAIN_ID.mainnet) {
-      coinChainId = chainId; //Note this will match the tokenChainId if the setup is correct (ie during registration the chainId was given correctly. Note that registration checks the validity of the ENS setup).
-    }
 
     consoleLog(`addr ${name} ${coinType} ${tokenId} ${tokenContract} ${chainId} ${tokenChainId} ${coinChainId}`);
 
