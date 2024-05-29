@@ -9,7 +9,6 @@ const EMPTY_CONTENT_HASH = '0x';
 export const SMARTCAT_ETH = "thesmartcats.eth";
 export const SMARTCAT_TOKEN = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
 const SMARTCAT_TOKEN_OWNER = "0x9c4171b69E5659647556E81007EF941f9B042b1a";
-const NFT_BASENAME = ".nft";
 
 const ENSIP9: Record<number, number> = {
   60: 1,
@@ -71,6 +70,19 @@ export class SQLiteDatabase {
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
 
+    // Individual entry NFT names
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS names_nft (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        contenthash TEXT,
+        token TEXT,
+        token_id INTEGER,
+        chain_id INTEGER,
+        resolver_chain INTEGER,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+    `);
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,12 +140,16 @@ export class SQLiteDatabase {
       }
     }
 
+    const deleteStmt = this.db.prepare(`DELETE FROM tokens WHERE name LIKE ?`);
+    const info = deleteStmt.run(`%.nft`);
+    consoleLog(`Deleted ${info.changes} entries`);
+
     //dump all tokens
-    // const csv = this.db.prepare('SELECT * FROM tokens ORDER BY name').all();
-    // for (const row of csv) {
-    //   // @ts-ignore
-    //   consoleLog(`TOKEN: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
-    // }
+    const csv = this.db.prepare('SELECT * FROM tokens ORDER BY name').all();
+    for (const row of csv) {
+      // @ts-ignore
+      consoleLog(`TOKEN: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
+    }
 
     // add thesmartcats.eth entry if required
     if (smartcatsIndex == -1) {
@@ -194,6 +210,7 @@ export class SQLiteDatabase {
         owner TEXT,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
+
 
       //need to move
 
@@ -316,6 +333,15 @@ export class SQLiteDatabase {
   addr(chainId: number, name: string, coinType: number) {
     //first get the base domain entry (ie catcollection.xnft.eth)
     const { row, tokenRow } = this.getTokenEntry(name, chainId);
+    var coinChainId = this.convertCoinTypeToEVMChainId(coinType);
+
+    const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name, coinChainId, chainId);
+
+    if (nftTokenRow) {
+      consoleLog(`nftTokenRow: ${JSON.stringify(nftTokenRow)} TBA`);
+      // @ts-ignore
+      return { addr: getTokenBoundAccount(coinChainId, nftTokenRow.token, nftTokenRow.token_id) };
+    }
 
     consoleLog(`ROW/TROW ${JSON.stringify(row)} ${JSON.stringify(tokenRow)} ${coinType}`);
 
@@ -332,8 +358,6 @@ export class SQLiteDatabase {
 
     // @ts-ignore
     const tokenChainId = tokenRow.chain_id;
-
-    var coinChainId = this.convertCoinTypeToEVMChainId(coinType);
 
     //testnets should return address with a default query
     if (coinChainId == CHAIN_ID.mainnet && chainId != CHAIN_ID.mainnet) {
@@ -420,13 +444,7 @@ export class SQLiteDatabase {
   getTokenEntry(name: string, chainId: number): { row: any, tokenRow: any } {
     let tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
 
-    if (tokenRow == null) {
-      tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name) + NFT_BASENAME, chainId);
-      consoleLog(`getTokenEntry ${name} ${chainId} ${JSON.stringify(tokenRow)}`);
-      if (tokenRow == null) {   
-        return { row: null, tokenRow: null };
-      } 
-    }
+    if (tokenRow == null) { return { row: null, tokenRow: null }; }
 
     // now get the token row
     // @ts-ignore
@@ -536,6 +554,7 @@ export class SQLiteDatabase {
   checkExisting(chainId: number, ensChainId: number, tokenAddress: string, tokenId: number): string | null {
     consoleLog(`checkExisting ${chainId} ${ensChainId} ${tokenAddress} ${tokenId}`);
     const tokenRows = this.db.prepare('SELECT * FROM tokens WHERE token = ? AND chain_id = ? AND resolver_chain = ?').all(tokenAddress, chainId, ensChainId);
+    const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE token = ? AND token_id = ? AND chain_id = ? AND resolver_chain = ?').get(tokenAddress, tokenId, chainId, ensChainId);
 
     // There may be 2 rows (one for token registration one for NFT reg), need to check both of them
     if (tokenRows) {
@@ -549,34 +568,32 @@ export class SQLiteDatabase {
           // @ts-ignore
           consoleLog(`TOKEN ID CHECK: ${instanceRow.name},${instanceRow.token_id},${instanceRow.tokens_index}`);
           // @ts-ignore
-          return instanceRow.name;
+          return instanceRow.name + "." + row.name;
         }
       }
+    }
+
+    if (nftTokenRow) {
+      consoleLog(`nftTokenRow: ${JSON.stringify(nftTokenRow)}`);
+      // @ts-ignore
+      return nftTokenRow.name;
     }
 
     return null;
   }
 
-  checkNFTNameAvailable(chainId: number, name: string, ensChainId: number): boolean {
-    //first pull the basename
-    const baseName = getBaseName(name) + NFT_BASENAME;
-    const nftTokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName, chainId, ensChainId);
-    const nftFullBase = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name + NFT_BASENAME, chainId, ensChainId); // check it's not a base name
+  checkNFTNameAvailable(name: string, ensChainId: number): boolean {
 
+    const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND resolver_chain = ?').get(name, ensChainId);
     const { row } = this.getTokenEntry(name, ensChainId);
+    const baseRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(name, ensChainId); //cannot be a base name
 
     //also check the full name isn't a base name
-    if (row != undefined || nftFullBase) {
+    if (row != undefined || nftTokenRow || baseRow) {
       // this corresponds to an actual registered token name or NFT base name, must fail
       return false;
     }
 
-    if (nftTokenRow) {
-      // @ts-ignore
-      const nftRow = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), nftTokenRow.id);
-      return nftRow == undefined;
-    }
-    
     return true;
   }
 
@@ -630,37 +647,19 @@ export class SQLiteDatabase {
     return true;
   }
 
-  registerNFT(name: string, chainId: number, tokenAddress: string, tokenId: number, owner: string, ensChainId: number): boolean {
+  registerNFT(name: string, chainId: number, tokenAddress: string, tokenId: number, ensChainId: number): boolean {
 
     //first get the base name index, from the supplying chain and the base name
     consoleLog(`registerNFT ${chainId} : ${name} ${getPrimaryName(name)}`);
-
-    const baseName = getBaseName(name) + NFT_BASENAME;
-
-    let tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName, chainId, ensChainId);
+    let tokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name, chainId, ensChainId);
 
     if (!tokenRow) {
-      this.db.transaction(() => {
-        consoleLog(`registerNFT Create base ${chainId} : ${baseName} ${ensChainId} }`);
-        //create entry
-        const stmt = this.db.prepare('INSERT INTO tokens (name, token, chain_id, resolver_chain, owner) VALUES (?, ?, ?, ?, ?)');
-        stmt.run(baseName, tokenAddress, chainId, ensChainId, owner);
-      })();
-      tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName, chainId, ensChainId);
+      const stmt = this.db.prepare('INSERT INTO names_nft (name, token, chain_id, token_id, resolver_chain) VALUES (?, ?, ?, ?, ?)');
+      stmt.run(name, tokenAddress, chainId, tokenId, ensChainId);
     } else {
       // @ts-ignore
       consoleLog(`registerNFT Existing base ${chainId} : ${baseName} ${ensChainId} ${tokenRow.id} }`);
-    }
-
-    // @ts-ignore
-    const nftRow = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), tokenRow.id);
-
-    if (!nftRow) {
-      // @ts-ignore
-      consoleLog(`registerNFT Create NFT ${name} ${tokenId} ${owner} ${tokenRow.id}`);
-      const addrExec = this.db.prepare('INSERT INTO names (name, tokens_index, token_id, owner) VALUES (?, ?, ?, ?)');
-      // @ts-ignore
-      addrExec.run(getPrimaryName(name), tokenRow.id, tokenId, owner);
+      return false;
     }
 
     return true;

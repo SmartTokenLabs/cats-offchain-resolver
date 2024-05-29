@@ -609,13 +609,13 @@ export async function createServer() {
 
 		consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
 
-		if (!db.checkAvailable(chainId, name)) {
+		if (!db.checkAvailable(numericEnsChainId, name)) {
 			return reply.status(403).send({ "error": "Name Unavailable" });
 		}
 
 		// Check someone hasn't registered an independent NFT on this name
-		if (db.checkNFTNameAvailable(numericChainId, name, numericEnsChainId)) {
-			return reply.status(403).send({ "error": "Name Unavailable" });
+		if (!db.checkNFTNameAvailable(name, numericEnsChainId)) {
+			return reply.status(403).send({ "error": "NFT Name Unavailable" });
 		}
 
 		let baseName = getBaseName(name);
@@ -704,11 +704,11 @@ export async function createServer() {
 			return reply.status(403).send({ "error": "NFT name cannot be a base name" });
 		}
 
-		if (!db.checkAvailable(chainId, name)) {
+		if (!db.checkAvailable(numericEnsChainId, name)) {
 			return reply.status(403).send({ "error": "Name Unavailable" });
 		}
 
-		if (!db.checkNFTNameAvailable(numericChainId, name, numericEnsChainId)) {
+		if (!db.checkNFTNameAvailable(name, numericEnsChainId)) {
 			return reply.status(403).send({ "error": "Name Unavailable" });
 		}
 
@@ -745,7 +745,7 @@ export async function createServer() {
 
 			if (userOwns) {
 				//name: string, chainId: number, tokenAddress: string, tokenId: number, owner: string, ensChainId: number
-				db.registerNFT(name, numericChainId, tokenAddress, tokenId, applyerAddress, numericEnsChainId);
+				db.registerNFT(name, numericChainId, tokenAddress, tokenId, numericEnsChainId);
 				return reply.status(200).send({ "result": "pass" });
 			} else {
 				// @ts-ignore
