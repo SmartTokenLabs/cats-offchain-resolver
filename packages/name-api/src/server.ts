@@ -12,7 +12,7 @@ import {
 } from "./constants";
 import fastify from "fastify";
 import fs from "fs";
-import { getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain } from "./resolve";
+import { getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain, CHAIN_ID } from "./resolve";
 import { isIPFS, tokenAvatarRequest } from "./tokenDiscovery";
 import { getTokenBoundAccount } from "./tokenBound";
 import { ethers, ZeroAddress } from "ethers";
@@ -309,7 +309,7 @@ export async function createServer() {
 		const numericChainId: number = Number(chainId);
 		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : chainId);
 
-		if (numericChainId != 1 && (numericChainId != numericEnsChainId)) {
+		if (numericEnsChainId != CHAIN_ID.mainnet && (numericChainId != numericEnsChainId)) {
 			return reply.status(403).send({ "fail": "Chain mismatch. For development purposes, non mainnet chains can only register tokens on the same chain." });
 		}
 
@@ -598,7 +598,6 @@ export async function createServer() {
 		return processRegistration(request, reply);
 	});
 
-	// can only be mainnet registrations
 	app.post('/register/:chainId/:name/:tokenId/:signature/:ensAddress?', async (request, reply) => {
 		return processRegistration(request, reply);
 	});
@@ -611,6 +610,11 @@ export async function createServer() {
 		consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
 
 		if (!db.checkAvailable(chainId, name)) {
+			return reply.status(403).send({ "error": "Name Unavailable" });
+		}
+
+		// Check someone hasn't registered an independent NFT on this name
+		if (db.checkNFTNameAvailable(numericChainId, name, numericEnsChainId)) {
 			return reply.status(403).send({ "error": "Name Unavailable" });
 		}
 
@@ -638,6 +642,12 @@ export async function createServer() {
 			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
 
+		// Prevent grabbing of NFT names
+		const existing = db.checkExisting(numericChainId, numericEnsChainId, tokenContract, tokenId);
+		if (existing) {
+			return reply.status(403).send({ "error": "NFT already registered: " + existing });
+		}
+
 		try {
 			const applyerAddress = recoverAddress(name, numericChainId, tokenId, signature);
 			consoleLog("APPLY: " + applyerAddress);
@@ -663,6 +673,92 @@ export async function createServer() {
 			return reply.status(403).send({ "fail": e.message });
 		}
 	}
+
+	app.post('/registerNFT/:chainId/:tokenAddress/:name/:tokenId/:signature/:ensChainId?', async (request, reply) => {
+		const { chainId, tokenAddress, tokenId, name, signature } = request.params;
+		const numericChainId = Number(chainId);
+		const numericEnsChainId = request.params.ensChainId ? Number(request.params.ensChainId) : numericChainId;
+
+		//only mainnet can assign ENS name to different chains
+		if (numericEnsChainId != CHAIN_ID.mainnet && numericEnsChainId != numericChainId) {
+			return reply.status(403).send({ "fail": "Chain mismatch. For development purposes, non mainnet chains can only register tokens on the same chain." });
+		}
+
+		consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} tokenAddress: ${tokenAddress} (${numericEnsChainId}`);
+
+		const santisedName = name.toLowerCase().replace(/\s+/g, '-').replace(/-{2,}/g, '').replace(/^-+/g, '').replace(/[;'"`\\]/g, '').replace(/^-+|-+$/g, '');
+
+		consoleLog(`Sanitised name: ${santisedName}`);
+
+		if (santisedName !== name) {
+			return reply.status(403).send({ "fail": `This name contains illegal characters ${name} vs ${santisedName}` });
+		}
+
+		if (name.length > NAME_LIMIT) {
+			return reply.status(403).send({ "fail": `Domain name too long, limit is ${NAME_LIMIT} characters.` });
+		}
+
+		const baseName = getBaseName(name);
+
+		if (baseName === name) {
+			return reply.status(403).send({ "error": "NFT name cannot be a base name" });
+		}
+
+		if (!db.checkAvailable(chainId, name)) {
+			return reply.status(403).send({ "error": "Name Unavailable" });
+		}
+
+		if (!db.checkNFTNameAvailable(numericChainId, name, numericEnsChainId)) {
+			return reply.status(403).send({ "error": "Name Unavailable" });
+		}
+
+		// Prevent grabbing of NFT names
+		const existing = db.checkExisting(numericChainId, numericEnsChainId, tokenAddress, tokenId);
+		if (existing) {
+			return reply.status(403).send({ "error": "NFT already registered: " + existing });
+		}
+
+		//now check this name resolves to this server
+		consoleLog(`Check resolver ${name} (${baseName})`);
+
+		//now check that resolver contract is correct
+		let nameHash = await sendResolverRequest(baseName, numericChainId);
+		let result = await waitForCheck(nameHash, chainId);
+
+		if (result == ResolverStatus.BASE_DOMAIN_NOT_POINTING_HERE) {
+			return reply.status(403).send({ "fail": `Resolver not correctly set for gateway.` });
+		} else if (result == ResolverStatus.INTERMEDIATE_DOMAIN_NOT_SET) {
+			return reply.status(403).send({ "fail": `Intermediate name resolver ${baseName} not set correctly.` });
+		} else if (result == ResolverStatus.CHAIN_MISMATCH) {
+			return reply.status(403).send({ "fail": `Chain mismatch for ${baseName} and ${chainId}.` });
+		} else if (result == ResolverStatus.NOT_FOUND) {
+			return reply.status(403).send({ "fail": `Name not found for ${baseName} and ${chainId}.` });
+		}
+
+		try {
+			const applyerAddress = recoverNFTRegistrationAddress(name, numericChainId, tokenAddress, tokenId, signature);
+			consoleLog("Registration address: " + applyerAddress);
+
+			var userOwns = await userOwnsNFT(numericChainId, tokenAddress, applyerAddress, tokenId);
+
+			console.log(`OWNS: ${userOwns}`);
+
+			if (userOwns) {
+				//name: string, chainId: number, tokenAddress: string, tokenId: number, owner: string, ensChainId: number
+				db.registerNFT(name, numericChainId, tokenAddress, tokenId, applyerAddress, numericEnsChainId);
+				return reply.status(200).send({ "result": "pass" });
+			} else {
+				// @ts-ignore
+				return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
+			}
+		} catch (e) {
+			if (lastError.length < 1000) { // don't overflow errors
+				lastError.push(e.message);
+			}
+
+			return reply.status(400).send({ "fail": e.message });
+		}
+	});
 
 	return app;
 }
@@ -794,14 +890,26 @@ async function getOwnerAddress(chainId: number, name: string, tokenAddress: stri
 	return ownerAddress;
 }
 
-function recoverAddress(name: string, chainID: number, tokenId: string, signature: string): string {
-	const message = `Registering your tokenId ${tokenId} name to ${name} on chain ${chainID}`;
+function recoverAddress(name: string, chainId: number, tokenId: string, signature: string): string {
+	const message = `Registering your tokenId ${tokenId} name to ${name} on chain ${chainId}`;
 	consoleLog("MSG: " + message);
 	return ethers.verifyMessage(message, addHexPrefix(signature));
 }
 
-function recoverRegistrationAddress(name: string, chainID: number, tokenContract: string, signature: string): string {
-	const message = `Attempting to register domain ${name} name to ${tokenContract} on chain ${chainID}`;
+function recoverRegistrationAddress(name: string, chainId: number, tokenContract: string, signature: string): string {
+	const message = `Attempting to register domain ${name} name to ${tokenContract} on chain ${chainId}`;
+	consoleLog("MSG: " + message);
+	consoleLog(`SIG: ${signature}`);
+	if (signature.length < 130 || signature.length > 132) {
+		consoleLog(`ERROR: ${signature.length}`);
+		return ZeroAddress;
+	} else {
+		return ethers.verifyMessage(message, addHexPrefix(signature));
+	}
+}
+
+function recoverNFTRegistrationAddress(name: string, chainId: number, tokenContract: string, tokenId: string,signature: string): string {
+	const message = `Attempting to register NFT ${name} name to ${tokenContract} ${tokenId} on chain ${chainId}`;
 	consoleLog("MSG: " + message);
 	consoleLog(`SIG: ${signature}`);
 	if (signature.length < 130 || signature.length > 132) {

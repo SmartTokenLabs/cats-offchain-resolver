@@ -9,6 +9,7 @@ const EMPTY_CONTENT_HASH = '0x';
 export const SMARTCAT_ETH = "thesmartcats.eth";
 export const SMARTCAT_TOKEN = "0xd5ca946ac1c1f24eb26dae9e1a53ba6a02bd97fe";
 const SMARTCAT_TOKEN_OWNER = "0x9c4171b69E5659647556E81007EF941f9B042b1a";
+const NFT_BASENAME = ".nft";
 
 const ENSIP9: Record<number, number> = {
   60: 1,
@@ -29,7 +30,7 @@ export interface BaseNameDef {
 
 let releaseMode = true;
 
-function customLogger(query: any) {
+function consoleLog(query: any) {
   if (!releaseMode) {
     console.log(query);
   }
@@ -40,7 +41,7 @@ export class SQLiteDatabase {
   db: BetterSqlite3.Database;
 
   constructor(dbName: string) {
-    this.db = new BetterSqlite3(dbName, { verbose: customLogger });
+    this.db = new BetterSqlite3(dbName, { verbose: consoleLog });
 
     /*this.db.exec(`
       DROP TABLE IF EXISTS names;
@@ -115,7 +116,7 @@ export class SQLiteDatabase {
 
     if (!tokensResolverChainExists) {
       //drop tables here
-      console.log("Updating to add resolver_chain");
+      consoleLog("Updating to add resolver_chain");
 
       this.db.exec(`
       ALTER TABLE tokens
@@ -131,12 +132,12 @@ export class SQLiteDatabase {
     // const csv = this.db.prepare('SELECT * FROM tokens ORDER BY name').all();
     // for (const row of csv) {
     //   // @ts-ignore
-    //   console.log(`TOKEN: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
+    //   consoleLog(`TOKEN: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
     // }
 
     // add thesmartcats.eth entry if required
     if (smartcatsIndex == -1) {
-      console.log(`Adding smartcats`);
+      consoleLog(`Adding smartcats`);
       this.registerBaseDomain(SMARTCAT_ETH, SMARTCAT_TOKEN, CHAIN_ID.polygon, 1, SMARTCAT_TOKEN_OWNER);
       smartcatsIndex = this.getBaseNameIndex(CHAIN_ID.polygon, SMARTCAT_TOKEN);
     }
@@ -145,11 +146,11 @@ export class SQLiteDatabase {
     //const smartcatsIndex = this.getBaseNameIndex(137, SMARTCAT_TOKEN);
 
     //const csv = this.db.prepare('SELECT * FROM names ORDER BY name').all();
-    //console.log(`${csv.length} entries ${JSON.stringify(csv)}`);
+    //consoleLog(`${csv.length} entries ${JSON.stringify(csv)}`);
 
     releaseMode = true;
 
-    console.log(`Smartcats index: ${smartcatsIndex}`);
+    consoleLog(`Smartcats index: ${smartcatsIndex}`);
 
     const columnInfo = this.db.prepare("PRAGMA table_info(names)").all();
     // @ts-ignore
@@ -163,17 +164,17 @@ export class SQLiteDatabase {
 
     this.setupENSIP9Reverse();
 
-    console.log(`entries: ${JSON.stringify(columnInfo)} columnExists ${columnExists} columnNotExists ${columnNotExists} textExists ${textExists} tokensIndexExists ${tokensIndexExists}`);
+    consoleLog(`entries: ${JSON.stringify(columnInfo)} columnExists ${columnExists} columnNotExists ${columnNotExists} textExists ${textExists} tokensIndexExists ${tokensIndexExists}`);
 
     if (!columnExists) {
-      console.log("Updating to add tokenId");
+      consoleLog("Updating to add tokenId");
       this.db.exec(`
       ALTER TABLE names
       ADD COLUMN token_id INTEGER;`);
     }
 
     const csv2 = this.db.prepare('SELECT * FROM names ORDER BY name').all();
-    console.log(`${csv2.length} entries2`);
+    consoleLog(`${csv2.length} entries2`);
 
     // the addresses entry is now moved into a separate database, as it may not be used 
     // - if not used then we use the default 6551 implementation
@@ -182,7 +183,7 @@ export class SQLiteDatabase {
     // @ts-ignore
     const addressesExists = columnInfo.some(column => column.name === 'addresses');
     if (addressesExists || columnNotExists || textExists) {
-      console.log(`Migrate database to remove preset addresses`);
+      consoleLog(`Migrate database to remove preset addresses`);
       this.db.exec(`
       CREATE TABLE IF NOT EXISTS names_temp (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -197,17 +198,17 @@ export class SQLiteDatabase {
       //need to move
 
       if (!tokensIndexExists) {
-        console.log("Updating to add tokens_index");
+        consoleLog("Updating to add tokens_index");
 
         this.db.prepare(`
         INSERT INTO names_temp (name, contenthash, token_id, tokens_index, createdAt)
         SELECT name, ? AS contenthash, token_id, ? AS tokens_index, createdAt FROM names
       `).run("", smartcatsIndex);
 
-        console.log("Updating to add addresses");
+        consoleLog("Updating to add addresses");
         // one-by-one, find all entries in "names" table that do not have a token_id, and add a new entry in "address_overrides" table with the address extracted from the "addresses" JSON
         const entries = this.db.prepare('SELECT * FROM names WHERE token_id IS NULL').all();
-        console.log(`${entries.length} entries3`);
+        consoleLog(`${entries.length} entries3`);
 
         for (const row of entries) {
           // @ts-ignore
@@ -216,7 +217,7 @@ export class SQLiteDatabase {
             //no token_id, so we need to add an address override
             const addresses = JSON.parse(address);
             // @ts-ignore
-            //console.log(`${row.name} ${JSON.stringify(addresses)}`);
+            //consoleLog(`${row.name} ${JSON.stringify(addresses)}`);
             const addr60 = addresses[60];
             if (addr60) {
               //enter this in address_overrides table, can now fix it, as SMARTCATS is 137
@@ -224,13 +225,13 @@ export class SQLiteDatabase {
               // @ts-ignore
               const newEntry = this.db.prepare('SELECT * FROM names_temp WHERE name = ?').get(row.name);
               // @ts-ignore
-              //console.log(`${row.name} ${newEntry.id} ${ensip9Chain} ${addr60}`);
+              //consoleLog(`${row.name} ${newEntry.id} ${ensip9Chain} ${addr60}`);
               const addrExec = this.db.prepare('INSERT INTO address_overrides (names_index, address, chain_id) VALUES (?, ?, ?)');
               // @ts-ignore
               addrExec.run(newEntry.id, addr60, 137);
             } else {
               // @ts-ignore
-              console.log(`${row.name} no 60 address`);
+              consoleLog(`${row.name} no 60 address`);
             }
           }
         }
@@ -258,7 +259,7 @@ export class SQLiteDatabase {
         WHERE INSTR(name, '.') > 0;
     `;
     this.db.exec(sql);
-    console.log("Domain names stripped.");
+    consoleLog("Domain names stripped.");
 
     // for debugging
     //this.dumpNames();
@@ -269,7 +270,7 @@ export class SQLiteDatabase {
   getTableDump(): string {
     const csv = this.db.prepare('SELECT * FROM names ORDER BY name').all();
 
-    console.log(`${csv.length} entries`);
+    consoleLog(`${csv.length} entries`);
     // @ts-ignore
     const csvString = csv.map(row => `${row.name},${row.token_id},${row.tokens_index}`).join('\n');
     return csvString;
@@ -316,10 +317,10 @@ export class SQLiteDatabase {
     //first get the base domain entry (ie catcollection.xnft.eth)
     const { row, tokenRow } = this.getTokenEntry(name, chainId);
 
-    if (!releaseMode) console.log(`ROW/TROW ${JSON.stringify(row)} ${JSON.stringify(tokenRow)} ${coinType}`);
+    consoleLog(`ROW/TROW ${JSON.stringify(row)} ${JSON.stringify(tokenRow)} ${coinType}`);
 
     if (row == null) {
-      if (!releaseMode) console.log("No row");
+      consoleLog("No row");
       return { addr: ZERO_ADDRESS };
     }
 
@@ -339,22 +340,22 @@ export class SQLiteDatabase {
       coinChainId = chainId; //Note this will match the tokenChainId if the setup is correct (ie during registration the chainId was given correctly. Note that registration checks the validity of the ENS setup).
     }
 
-    if (!releaseMode) console.log(`addr ${name} ${coinType} ${tokenId} ${tokenContract} ${chainId} ${tokenChainId} ${coinChainId}`);
+    consoleLog(`addr ${name} ${coinType} ${tokenId} ${tokenContract} ${chainId} ${tokenChainId} ${coinChainId}`);
 
     // @ts-ignore
     const addressOverride = this.db.prepare('SELECT address FROM address_overrides WHERE names_index = ? AND chain_id = ?').get(row.id, coinChainId); //use EVM chainId in database
 
     //Rules: unless we have additional address in address_overrides then provide 6551 address only for the token chain
     if (addressOverride) {
-      if (!releaseMode) console.log("Override");
+      consoleLog("Override");
       // @ts-ignore
       return { addr: addressOverride.address };
     } else if (tokenChainId == coinChainId) {
       //calculate the 6551 address for the chainId of the token
-      if (!releaseMode) console.log("TBA");
+      consoleLog("TBA");
       return { addr: getTokenBoundAccount(coinChainId, tokenContract, tokenId) };
     } else {
-      //console.log("ZERO ADDRESS");
+      //consoleLog("ZERO ADDRESS");
       return { addr: ZERO_ADDRESS };
     }
   }
@@ -363,19 +364,19 @@ export class SQLiteDatabase {
   updateTokenId(chainId: number, name: string, tokenId: number) {
     const { row } = this.getTokenEntry(name, chainId);
 
-    if (!releaseMode) console.log(`updateTokenId ${name} ${tokenId} ${JSON.stringify(row)}`);
+    consoleLog(`updateTokenId ${name} ${tokenId} ${JSON.stringify(row)}`);
 
     if (row) {
       try {
         //does this row need tokenId update?
         if (!row.token_id) {
-          if (!releaseMode) console.log(`updateTokenId2 ${name} ${tokenId} ${JSON.stringify(row)}`);
+          consoleLog(`updateTokenId2 ${name} ${tokenId} ${JSON.stringify(row)}`);
           // @ts-ignore
           this.db.prepare('UPDATE names SET token_id = ? WHERE id = ?').run(tokenId, row.id);
         }
 
       } catch (error) {
-        console.log(error);
+        consoleLog(error);
       }
     }
   }
@@ -417,9 +418,15 @@ export class SQLiteDatabase {
   }
 
   getTokenEntry(name: string, chainId: number): { row: any, tokenRow: any } {
-    const tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
+    let tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
 
-    if (tokenRow == null) { return { row: null, tokenRow: null }; }
+    if (tokenRow == null) {
+      tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name) + NFT_BASENAME, chainId);
+      consoleLog(`getTokenEntry ${name} ${chainId} ${JSON.stringify(tokenRow)}`);
+      if (tokenRow == null) {   
+        return { row: null, tokenRow: null };
+      } 
+    }
 
     // now get the token row
     // @ts-ignore
@@ -448,7 +455,7 @@ export class SQLiteDatabase {
     // @ts-ignore
     const row = this.db.prepare('SELECT name FROM names WHERE tokens_index = ? AND token_id = ?').get(tokenRow.id, tokenId);
 
-    if (!releaseMode) console.log(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(row)}`);
+    consoleLog(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(row)}`);
 
     if (row) {
       // @ts-ignore
@@ -460,17 +467,17 @@ export class SQLiteDatabase {
 
   text(chainId: number, name: string, key: string) {
 
-    if (!releaseMode) console.log(`text ${chainId} ${name} ${key}`);
+    consoleLog(`text ${chainId} ${name} ${key}`);
     const { row } = this.getTokenEntry(name, chainId);
 
-    if (!releaseMode) console.log(`tokenRow ${JSON.stringify(row)}`);
+    consoleLog(`tokenRow ${JSON.stringify(row)}`);
 
     if (!row) {
       return '';
     } else {
       const textRow = this.db.prepare('SELECT * FROM text_entries WHERE names_index = ? AND key = ?').get(row.id, key.toLowerCase());
       // @ts-ignore
-      if (!releaseMode) console.log(`${name} ${key} ${JSON.stringify(textRow)}`);
+      consoleLog(`${name} ${key} ${JSON.stringify(textRow)}`);
       if (!textRow) {
         return '';
       } else {
@@ -482,7 +489,7 @@ export class SQLiteDatabase {
 
   // @ts-ignore
   setText(chainId: number, name: string, key: string, value: string) {
-    if (!releaseMode) console.log(`setText ${chainId} ${name} ${key} ${value}`);
+    consoleLog(`setText ${chainId} ${name} ${key} ${value}`);
     const { row } = this.getTokenEntry(name, chainId);
 
     if (!row) {
@@ -499,7 +506,7 @@ export class SQLiteDatabase {
         stmt.run(value, row.id, key.toLowerCase());
       }
     } catch (e) {
-      console.log(`Error setting text ${e}`);
+      consoleLog(`Error setting text ${e}`);
     }
   }
 
@@ -508,13 +515,13 @@ export class SQLiteDatabase {
 
     try {
       const { row } = this.getTokenEntry(name, chainId);
-      if (!releaseMode) console.log(`${JSON.stringify(row)}`);
+      consoleLog(`${JSON.stringify(row)}`);
 
       if (row && row.contenthash) {
         contenthash = row.contenthash;
       }
     } catch (e) {
-      console.log(`Error: ${e}`);
+      consoleLog(`Error: ${e}`);
     }
 
     return contenthash;
@@ -523,6 +530,54 @@ export class SQLiteDatabase {
   checkAvailable(chainId: number, name: string): boolean {
     const { row } = this.getTokenEntry(name, chainId);
     return row == undefined;
+  }
+
+  // This check is to prevent name grabbing - one an NFT is registered, further names cannot be registered by the same NFT
+  checkExisting(chainId: number, ensChainId: number, tokenAddress: string, tokenId: number): string | null {
+    consoleLog(`checkExisting ${chainId} ${ensChainId} ${tokenAddress} ${tokenId}`);
+    const tokenRows = this.db.prepare('SELECT * FROM tokens WHERE token = ? AND chain_id = ? AND resolver_chain = ?').all(tokenAddress, chainId, ensChainId);
+
+    // There may be 2 rows (one for token registration one for NFT reg), need to check both of them
+    if (tokenRows) {
+      for (const row of tokenRows) {
+        // @ts-ignore
+        consoleLog(`TOKEN CHECK: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
+        // check for tokenId
+        // @ts-ignore
+        const instanceRow = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND tokens_index = ?').get(tokenId, row.id);
+        if (instanceRow) {
+          // @ts-ignore
+          consoleLog(`TOKEN ID CHECK: ${instanceRow.name},${instanceRow.token_id},${instanceRow.tokens_index}`);
+          // @ts-ignore
+          return instanceRow.name;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  checkNFTNameAvailable(chainId: number, name: string, ensChainId: number): boolean {
+    //first pull the basename
+    const baseName = getBaseName(name) + NFT_BASENAME;
+    const nftTokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName, chainId, ensChainId);
+    const nftFullBase = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name + NFT_BASENAME, chainId, ensChainId); // check it's not a base name
+
+    const { row } = this.getTokenEntry(name, ensChainId);
+
+    //also check the full name isn't a base name
+    if (row != undefined || nftFullBase) {
+      // this corresponds to an actual registered token name or NFT base name, must fail
+      return false;
+    }
+
+    if (nftTokenRow) {
+      // @ts-ignore
+      const nftRow = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), nftTokenRow.id);
+      return nftRow == undefined;
+    }
+    
+    return true;
   }
 
   //Structure:
@@ -535,12 +590,12 @@ export class SQLiteDatabase {
     const baseName = getBaseName(name);
 
     //first get the base name index, from the supplying chain and the base name
-    if (!releaseMode) console.log(`addElement ${chainId} : ${name} ${getPrimaryName(name)}`);
+    consoleLog(`addElement ${chainId} : ${name} ${getPrimaryName(name)}`);
     const baseNameIndex = this.getTokensIndexFromName(chainId, name);
     //const retrieveBaseName = this.getBaseName(chainId, address);
 
     if (baseNameIndex == -1) {
-      if (!releaseMode) console.log(`BaseName ${baseName} not registered on the server, cannot create this domain name`);
+      consoleLog(`BaseName ${baseName} not registered on the server, cannot create this domain name`);
       return false;
     }
 
@@ -575,16 +630,52 @@ export class SQLiteDatabase {
     return true;
   }
 
+  registerNFT(name: string, chainId: number, tokenAddress: string, tokenId: number, owner: string, ensChainId: number): boolean {
+
+    //first get the base name index, from the supplying chain and the base name
+    consoleLog(`registerNFT ${chainId} : ${name} ${getPrimaryName(name)}`);
+
+    const baseName = getBaseName(name) + NFT_BASENAME;
+
+    let tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName, chainId, ensChainId);
+
+    if (!tokenRow) {
+      this.db.transaction(() => {
+        consoleLog(`registerNFT Create base ${chainId} : ${baseName} ${ensChainId} }`);
+        //create entry
+        const stmt = this.db.prepare('INSERT INTO tokens (name, token, chain_id, resolver_chain, owner) VALUES (?, ?, ?, ?, ?)');
+        stmt.run(baseName, tokenAddress, chainId, ensChainId, owner);
+      })();
+      tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName, chainId, ensChainId);
+    } else {
+      // @ts-ignore
+      consoleLog(`registerNFT Existing base ${chainId} : ${baseName} ${ensChainId} ${tokenRow.id} }`);
+    }
+
+    // @ts-ignore
+    const nftRow = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), tokenRow.id);
+
+    if (!nftRow) {
+      // @ts-ignore
+      consoleLog(`registerNFT Create NFT ${name} ${tokenId} ${owner} ${tokenRow.id}`);
+      const addrExec = this.db.prepare('INSERT INTO names (name, tokens_index, token_id, owner) VALUES (?, ?, ?, ?)');
+      // @ts-ignore
+      addrExec.run(getPrimaryName(name), tokenRow.id, tokenId, owner);
+    }
+
+    return true;
+  }
+
   updateTokenOwner(name: string, chainId: number, owner: string) {
-    if (!releaseMode) console.log(`Updating owner for ${name} ${chainId} ${owner}`);
+    consoleLog(`Updating owner for ${name} ${chainId} ${owner}`);
 
     const { row } = this.getTokenEntry(name, chainId);
 
     if (row) {
       this.db.prepare('UPDATE names SET owner = ? WHERE id = ?').run(owner, row.id);
-      if (!releaseMode) console.log(`Updated owner for ${name} ${chainId} ${owner}`);
+      consoleLog(`Updated owner for ${name} ${chainId} ${owner}`);
     } else {
-      if (!releaseMode) console.log(`Couldn't find name ${name} ${chainId}`);
+      consoleLog(`Couldn't find name ${name} ${chainId}`);
     }
   }
 
@@ -603,14 +694,14 @@ export class SQLiteDatabase {
     const { row } = this.getTokenEntry(name, chainId);
 
     if (!row) {
-      console.log(`${name} not registered on the server, cannot update this record`);
+      consoleLog(`${name} not registered on the server, cannot update this record`);
       return;
     }
 
     try {
       this.db.prepare('UPDATE names SET contenthash = ? WHERE id = ?').run(ipfsHash, row.id);
     } catch (error) {
-      console.log(error);
+      consoleLog(error);
     }
   }
 
@@ -638,27 +729,27 @@ export class SQLiteDatabase {
       const addressOverrideEntry = this.db.prepare('SELECT * FROM address_overrides WHERE address = ? AND chain_id = ?').get(address, 137); //must be unique for the chain
       var row;
       if (!addressOverrideEntry) {
-        if (!releaseMode) console.log(`Get row from tokenId ${tokenId}`);
+        consoleLog(`Get row from tokenId ${tokenId}`);
         row = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND tokens_index = ?').get(tokenId, smartcatsIndex);
       } else {
         // use addressOverrideEntry
         // @ts-ignore
         row = this.db.prepare('SELECT * FROM names WHERE id = ?').get(addressOverrideEntry.names_index);
-        if (!releaseMode) console.log(`Get row from addressOverride ${tokenId} ${JSON.stringify(addressOverrideEntry)}`);
+        consoleLog(`Get row from addressOverride ${tokenId} ${JSON.stringify(addressOverrideEntry)}`);
       }
       if (row) {
-        if (!releaseMode) console.log(`${address} ${JSON.stringify(row)}`);
-        if (!releaseMode) console.log(`${address} ${JSON.stringify(tokenRow)}`);
+        consoleLog(`${address} ${JSON.stringify(row)}`);
+        consoleLog(`${address} ${JSON.stringify(tokenRow)}`);
         //get basename
         // @ts-ignore
-        if (!releaseMode) console.log(`${row.name}.${tokenRow.name}`);
+        consoleLog(`${row.name}.${tokenRow.name}`);
         // @ts-ignore
         return `${row.name}.${tokenRow.name}`;
       } else {
         return null;
       }
     } catch (error) {
-      if (!releaseMode) console.log(`Error: ${error}`);
+      consoleLog(`Error: ${error}`);
       return null;
     }
   }
@@ -667,11 +758,11 @@ export class SQLiteDatabase {
   isBaseNameRegistered(chainId: number, ensChainId: number, baseName: string): boolean {
     try {
       const row = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName.toLowerCase(), chainId, ensChainId);
-      if (!releaseMode) console.log(`isBaseNameRegistered ${baseName} ${JSON.stringify(row)}`);
+      consoleLog(`isBaseNameRegistered ${baseName} ${JSON.stringify(row)}`);
       return (row !== undefined);
     } catch (error) {
       // @ts-ignore
-      if (!releaseMode) console.log(`${error.message}`);
+      consoleLog(`${error.message}`);
       return false;
     }
   }
@@ -679,7 +770,7 @@ export class SQLiteDatabase {
   getTokenContractRegistered(chainId: number, ensChainId: number, tokenContract: string): boolean {
     try {
       const row = this.db.prepare('SELECT * FROM tokens WHERE chain_id = ? AND resolver_chain = ? AND token LIKE ?').get(chainId, ensChainId, tokenContract.toLowerCase());
-      if (!releaseMode) console.log(`${tokenContract} ${row} ${row !== undefined}`);
+      consoleLog(`${tokenContract} ${row} ${row !== undefined}`);
       return (row !== undefined);
     } catch (error) {
       return false;
@@ -690,13 +781,13 @@ export class SQLiteDatabase {
   registerBaseDomain(baseName: string, tokenContract: string, chainId: number, ensChainId: number, owner: string) {
 
     if (this.isBaseNameRegistered(chainId, ensChainId, baseName)) {
-      if (!releaseMode) console.log(`BaseName ${baseName} already registered on the server, cannot create this domain name`);
+      consoleLog(`BaseName ${baseName} already registered on the server, cannot create this domain name`);
       return;
     }
 
     //check for chain/token clash:
     if (this.getBaseNameIndex(chainId, tokenContract) != -1) {
-      if (!releaseMode) console.log(`BaseName ${baseName} clash with existing token: this would create ambiguity.`);
+      consoleLog(`BaseName ${baseName} clash with existing token: this would create ambiguity.`);
       return;
     }
 
@@ -705,7 +796,7 @@ export class SQLiteDatabase {
   }
 
   getTokenDetails(chainId: number, ensChainId: number, baseName: string): BaseNameDef | null {
-    if (!releaseMode) console.log(`getTokenDetails ${chainId} ${ensChainId} ${baseName}`);
+    consoleLog(`getTokenDetails ${chainId} ${ensChainId} ${baseName}`);
     const row = this.db.prepare('SELECT token FROM tokens WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(baseName.toLowerCase(), chainId, ensChainId);
 
     if (row) {
@@ -761,7 +852,7 @@ export class SQLiteDatabase {
         // @ts-ignore
         const tbaAddr = getTokenBoundAccount(137, SMARTCAT_TOKEN, row.token_id)
         // @ts-ignore
-        console.log(`* ${row.name}, ${row.token_id}, ${tbaAddr}`);
+        consoleLog(`* ${row.name}, ${row.token_id}, ${tbaAddr}`);
         count1++;
         // @ts-ignore
       } else if (row.token_id === null && count2 < 100) {
@@ -772,10 +863,10 @@ export class SQLiteDatabase {
 
         if (addressOverrideEntry) {
           // @ts-ignore
-          console.log(`- ${row.name} ${addressOverrideEntry.address}`);
+          consoleLog(`- ${row.name} ${addressOverrideEntry.address}`);
         } else {
           // @ts-ignore
-          console.log(`- ${row.name} no address ${ENSIP9_REVERSE.get(137)}`);
+          consoleLog(`- ${row.name} no address ${ENSIP9_REVERSE.get(137)}`);
         }
         count2++;
       }

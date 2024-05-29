@@ -6,7 +6,6 @@ import { abi as IResolverService_abi } from '@ensdomains/offchain-resolver-contr
 import { abi as Resolver_abi } from '@ensdomains/ens-contracts/artifacts/contracts/resolvers/Resolver.sol/Resolver.json';
 import fetch from 'node-fetch';
 import { ETH_COIN_TYPE } from './utils';
-import { SMARTCATS_RESOLVER } from './constants';
 const Resolver = new ethers.utils.Interface(Resolver_abi);
 
 interface DatabaseResult {
@@ -132,7 +131,7 @@ export function makeServer(signer: ethers.utils.SigningKey, dataPath: string, tt
       type: 'resolve',
       func: async ([encodedName, data]: Result, request) => {
         const name = decodeDnsName(Buffer.from(encodedName.slice(2), 'hex'));
-        const resolverAddr: string = request.to.toString();
+        //const resolverAddr: string = request.to.toString();
         //console.log(`name: ${name} dataPath ${dataPath} ${data} ${request?.data}`);
         //console.log(`Request: ${resolverAddr}`);
 
@@ -147,14 +146,11 @@ export function makeServer(signer: ethers.utils.SigningKey, dataPath: string, tt
           //console.log(`Request2: ${resolverAddr} ${chainId}`);
           //console.log(`${chainId}`);
           chainIdToUse = chainId;
-        } catch (e) {
-          //is this coming from the SmartCats mainnet resolver?
-          //console.log(`Request3: ${resolverAddr}`);
-          if (resolverAddr.toLowerCase() === SMARTCATS_RESOLVER.toLowerCase()) {
-            chainIdToUse = 1; // Mainnet smartcats resolver - this contract doesn't report chainId
-          } else {
-            chainIdToUse = 8887; //put this onto a chain that doesn't exist (this will be logged safely into that database so as not to overwrite anything)
+          if (chainIdToUse == 0) {
+            chainIdToUse = 8887;
           }
+        } catch (e) {
+          chainIdToUse = 8887; //put this onto a chain that doesn't exist (this will be logged safely into that database so as not to overwrite anything)
         }
 
         // Query the database
