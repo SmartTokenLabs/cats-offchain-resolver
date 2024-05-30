@@ -518,7 +518,7 @@ export async function createServer() {
 
 		//check signature
 		// @ts-ignore
-		var ownerAddress = applyerAddress; //await getOwnerAddress(chainId, name, tokenRow.token, row.owner, row.token_id); //TODO: uncomment this!!
+		var ownerAddress = await getOwnerAddress(chainId, name, tokenRow.token, row.owner, row.token_id);
 
 		consoleLog(`Storage: ${ownerAddress} ${applyerAddress}`);
 
@@ -739,7 +739,7 @@ export async function createServer() {
 			const applyerAddress = recoverNFTRegistrationAddress(name, numericChainId, tokenAddress, tokenId, signature);
 			consoleLog("Registration address: " + applyerAddress);
 
-			var userOwns = await userOwnsNFT(numericChainId, tokenAddress, applyerAddress, tokenId); //TODO: uncomment this!!
+			var userOwns = await userOwnsNFT(numericChainId, tokenAddress, applyerAddress, tokenId);
 
 			console.log(`OWNS: ${userOwns}`);
 
@@ -970,7 +970,7 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
 	} else {
 		consoleLog("Doesn't own");
 		cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: false, timeStamp: Date.now() });
-		return true; //false; //TODO: uncomment this!!
+		return false;
 	}
 }
 
