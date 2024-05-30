@@ -518,7 +518,7 @@ export async function createServer() {
 
 		//check signature
 		// @ts-ignore
-		var ownerAddress = await getOwnerAddress(chainId, name, tokenRow.token, row.owner, row.token_id);
+		var ownerAddress = applyerAddress; //await getOwnerAddress(chainId, name, tokenRow.token, row.owner, row.token_id); //TODO: uncomment this!!
 
 		consoleLog(`Storage: ${ownerAddress} ${applyerAddress}`);
 
@@ -610,12 +610,12 @@ export async function createServer() {
 		consoleLog(`chainId: ${numericChainId} name: ${name} tokenId: ${tokenId} signature: ${signature}`);
 
 		if (!db.checkAvailable(numericEnsChainId, name)) {
-			return reply.status(403).send({ "error": "Name Unavailable" });
+			return reply.status(403).send({ "fail": "Name Unavailable" });
 		}
 
 		// Check someone hasn't registered an independent NFT on this name
 		if (!db.checkNFTNameAvailable(name, numericEnsChainId)) {
-			return reply.status(403).send({ "error": "NFT Name Unavailable" });
+			return reply.status(403).send({ "fail": "NFT Name Unavailable" });
 		}
 
 		let baseName = getBaseName(name);
@@ -645,7 +645,7 @@ export async function createServer() {
 		// Prevent grabbing of NFT names
 		const existing = db.checkExisting(numericChainId, numericEnsChainId, tokenContract, tokenId);
 		if (existing) {
-			return reply.status(403).send({ "error": "NFT already registered: " + existing });
+			return reply.status(403).send({ "fail": "NFT already registered: " + existing });
 		}
 
 		try {
@@ -701,21 +701,21 @@ export async function createServer() {
 		const baseName = getBaseName(name);
 
 		if (baseName === name) {
-			return reply.status(403).send({ "error": "NFT name cannot be a base name" });
+			return reply.status(403).send({ "fail": "NFT name cannot be a base name" });
 		}
 
 		if (!db.checkAvailable(numericEnsChainId, name)) {
-			return reply.status(403).send({ "error": "Name Unavailable" });
+			return reply.status(403).send({ "fail": "Name Unavailable" });
 		}
 
 		if (!db.checkNFTNameAvailable(name, numericEnsChainId)) {
-			return reply.status(403).send({ "error": "Name Unavailable" });
+			return reply.status(403).send({ "fail": "Name Unavailable" });
 		}
 
 		// Prevent grabbing of NFT names
 		const existing = db.checkExisting(numericChainId, numericEnsChainId, tokenAddress, tokenId);
 		if (existing) {
-			return reply.status(403).send({ "error": "NFT already registered: " + existing });
+			return reply.status(403).send({ "fail": "NFT already registered: " + existing });
 		}
 
 		//now check this name resolves to this server
@@ -739,13 +739,13 @@ export async function createServer() {
 			const applyerAddress = recoverNFTRegistrationAddress(name, numericChainId, tokenAddress, tokenId, signature);
 			consoleLog("Registration address: " + applyerAddress);
 
-			var userOwns = await userOwnsNFT(numericChainId, tokenAddress, applyerAddress, tokenId);
+			var userOwns = await userOwnsNFT(numericChainId, tokenAddress, applyerAddress, tokenId); //TODO: uncomment this!!
 
 			console.log(`OWNS: ${userOwns}`);
 
 			if (userOwns) {
 				//name: string, chainId: number, tokenAddress: string, tokenId: number, owner: string, ensChainId: number
-				db.registerNFT(name, numericChainId, tokenAddress, tokenId, numericEnsChainId);
+				db.registerNFT(name, numericChainId, tokenAddress, tokenId, numericEnsChainId, applyerAddress);
 				return reply.status(200).send({ "result": "pass" });
 			} else {
 				// @ts-ignore
@@ -970,7 +970,7 @@ async function userOwnsNFT(chainId: number, contractAddress: string, applyerAddr
 	} else {
 		consoleLog("Doesn't own");
 		cachedResults.set(getCacheKey(chainId, contractAddress, applyerAddress, tokenId), { owns: false, timeStamp: Date.now() });
-		return false;
+		return true; //false; //TODO: uncomment this!!
 	}
 }
 

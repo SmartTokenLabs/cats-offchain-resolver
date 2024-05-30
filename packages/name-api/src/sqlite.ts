@@ -59,6 +59,10 @@ export class SQLiteDatabase {
       DROP TABLE IF_EXISTS text_entries;
     `)*/
 
+    /*this.db.exec(`
+      DROP TABLE IF_EXISTS names_nft;
+    `);*/
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS names (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,21 +70,17 @@ export class SQLiteDatabase {
         contenthash TEXT,
         token_id INTEGER,
         tokens_index INTEGER,
+        nft_names_index INTEGER,
         owner TEXT,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
     `);
 
-    // Individual entry NFT names
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS names_nft (
+      CREATE TABLE IF NOT EXISTS nft_names (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        contenthash TEXT,
         token TEXT,
-        token_id INTEGER,
         chain_id INTEGER,
-        resolver_chain INTEGER,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+        resolver_chain INTEGER);
     `);
 
     this.db.exec(`
@@ -177,6 +177,8 @@ export class SQLiteDatabase {
     const textExists = columnInfo.some(column => column.name === 'text');
     // @ts-ignore
     const tokensIndexExists = columnInfo.some(column => column.name === 'tokens_index');
+    // @ts-ignore
+    const nftNamesIndexExists = columnInfo.some(column => column.name === 'nft_names_index');
 
     this.setupENSIP9Reverse();
 
@@ -269,19 +271,39 @@ export class SQLiteDatabase {
         `);
     }
 
-    // now run through all entries in "names" table and strip the "name" entry so all the domains are only one name:
-    const sql = `
-        UPDATE names
-        SET name = SUBSTR(name, 1, INSTR(name, '.') - 1)
-        WHERE INSTR(name, '.') > 0;
-    `;
-    this.db.exec(sql);
-    consoleLog("Domain names stripped.");
+    if (!nftNamesIndexExists) {
+      consoleLog(`Migrate database to remove preset addresses`);
+      this.db.exec(`
+      CREATE TABLE IF NOT EXISTS names_temp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        contenthash TEXT,
+        token_id INTEGER,
+        tokens_index INTEGER,
+        nft_names_index INTEGER,
+        owner TEXT,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+      `);
+
+      this.db.prepare(`
+        INSERT INTO names_temp (name, contenthash, token_id, tokens_index, owner, createdAt)
+        SELECT name, contenthash, token_id, tokens_index, owner, createdAt FROM names
+      `).run();
+
+      this.db.exec(`
+            DROP TABLE names;
+        `);
+
+      this.db.exec(`
+            ALTER TABLE names_temp RENAME TO names;
+        `);
+    }
+
+    releaseMode = (RELEASE_MODE == "true");
 
     // for debugging
     //this.dumpNames();
-
-    releaseMode = (RELEASE_MODE == "true");
+    this.dumpEntries();
   }
 
   getTableDump(): string {
@@ -338,16 +360,6 @@ export class SQLiteDatabase {
     //testnets should return address with a default query
     if (coinChainId == CHAIN_ID.mainnet && chainId != CHAIN_ID.mainnet) {
       coinChainId = chainId; //Note this will match the tokenChainId if the setup is correct (ie during registration the chainId was given correctly. Note that registration checks the validity of the ENS setup).
-    }
-
-    const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name, coinChainId, chainId);
-
-    if (nftTokenRow) {
-      // @ts-ignore
-      consoleLog(`nftTokenRow: ${JSON.stringify(nftTokenRow)} TBA`);
-      //return the address from the NFT token
-      // @ts-ignore
-      return { addr: getTokenBoundAccount(coinChainId, nftTokenRow.token, nftTokenRow.token_id) };
     }
 
     consoleLog(`ROW/TROW ${JSON.stringify(row)} ${JSON.stringify(tokenRow)} ${coinType}`);
@@ -444,15 +456,34 @@ export class SQLiteDatabase {
   }
 
   getTokenEntry(name: string, chainId: number): { row: any, tokenRow: any } {
-    let tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
+    let { row, tokenRow } = this.getNFTTokenEntry(name, chainId);
 
-    if (tokenRow == null) { return { row: null, tokenRow: null }; }
+    if (tokenRow == null) {
+      tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
+      // @ts-ignore
+      row = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), tokenRow.id);
+    }
 
     // now get the token row
-    // @ts-ignore
-    const row = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), tokenRow.id);
-
     return { row, tokenRow };
+  }
+
+  getNFTTokenEntry(name: string, chainId: number): { row: any, tokenRow: any } {
+    consoleLog(`getNFTTokenEntry ${name} ${chainId}`);
+    let rows = this.db.prepare('SELECT * FROM names WHERE name = ?').all(name);
+
+    //now check for the correct chain
+    for (const row of rows) {
+      consoleLog(`Checking ${JSON.stringify(row)}`);
+      // @ts-ignore
+      const tokenRow = this.db.prepare('SELECT * FROM nft_names WHERE id = ? AND resolver_chain = ?').get(row.nft_names_index, chainId);
+      if (tokenRow) {
+        // @ts-ignore
+        return { row, tokenRow };
+      }
+    }
+
+    return { row: null, tokenRow: null };
   }
 
   //has this tokenId registered a name for this domain?
@@ -513,6 +544,7 @@ export class SQLiteDatabase {
     const { row } = this.getTokenEntry(name, chainId);
 
     if (!row) {
+      consoleLog(`unable to set text, row not found ${chainId} ${name} ${key} ${value}`);
       return;
     }
 
@@ -539,7 +571,7 @@ export class SQLiteDatabase {
 
       if (row && row.contenthash) {
         contenthash = row.contenthash;
-      }
+      } 
     } catch (e) {
       consoleLog(`Error: ${e}`);
     }
@@ -555,30 +587,29 @@ export class SQLiteDatabase {
   // This check is to prevent name grabbing - one an NFT is registered, further names cannot be registered by the same NFT
   checkExisting(chainId: number, ensChainId: number, tokenAddress: string, tokenId: number): string | null {
     consoleLog(`checkExisting ${chainId} ${ensChainId} ${tokenAddress} ${tokenId}`);
-    const tokenRows = this.db.prepare('SELECT * FROM tokens WHERE token = ? AND chain_id = ? AND resolver_chain = ?').all(tokenAddress, chainId, ensChainId);
-    const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE token = ? AND token_id = ? AND chain_id = ? AND resolver_chain = ?').get(tokenAddress, tokenId, chainId, ensChainId);
+    const tokenRow = this.db.prepare('SELECT * FROM tokens WHERE token = ? AND chain_id = ? AND resolver_chain = ?').get(tokenAddress, chainId, ensChainId);
+    const nftNameRow = this.db.prepare('SELECT * FROM nft_names WHERE token = ? AND chain_id = ? AND resolver_chain = ?').get(tokenAddress, chainId, ensChainId);
 
-    // There may be 2 rows (one for token registration one for NFT reg), need to check both of them
-    if (tokenRows) {
-      for (const row of tokenRows) {
-        // @ts-ignore
-        consoleLog(`TOKEN CHECK: ${row.name},${row.token},${row.chain_id},${row.resolver_chain}`);
-        // check for tokenId
-        // @ts-ignore
-        const instanceRow = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND tokens_index = ?').get(tokenId, row.id);
-        if (instanceRow) {
-          // @ts-ignore
-          consoleLog(`TOKEN ID CHECK: ${instanceRow.name},${instanceRow.token_id},${instanceRow.tokens_index}`);
-          // @ts-ignore
-          return instanceRow.name + "." + row.name;
-        }
-      }
-    }
-
-    if (nftTokenRow) {
-      consoleLog(`nftTokenRow: ${JSON.stringify(nftTokenRow)}`);
+    if (tokenRow) {
       // @ts-ignore
-      return nftTokenRow.name;
+      const instanceRow = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND tokens_index = ?').get(tokenId, tokenRow.id);
+      if (instanceRow) {
+        // @ts-ignore
+        consoleLog(`TOKEN ID CHECK: ${instanceRow.name},${instanceRow.token_id},${instanceRow.tokens_index}`);
+        // @ts-ignore
+        return instanceRow.name + "." + tokenRow.name;
+      }
+    } 
+    
+    if (nftNameRow) {
+      // @ts-ignore
+      consoleLog(`NFT CHECK: ${JSON.stringify(nftNameRow)}`);
+      // @ts-ignore
+      const instanceRow = this.db.prepare('SELECT * FROM names WHERE token_id = ? AND nft_names_index = ?').get(tokenId, nftNameRow.id);
+      if (instanceRow) {
+        // @ts-ignore
+        return instanceRow.name;
+      }
     }
 
     return null;
@@ -586,12 +617,11 @@ export class SQLiteDatabase {
 
   checkNFTNameAvailable(name: string, ensChainId: number): boolean {
 
-    const nftTokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND resolver_chain = ?').get(name, ensChainId);
     const { row } = this.getTokenEntry(name, ensChainId);
     const baseRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(name, ensChainId); //cannot be a base name
 
     //also check the full name isn't a base name
-    if (row != undefined || nftTokenRow || baseRow) {
+    if (row != undefined || baseRow) {
       // this corresponds to an actual registered token name or NFT base name, must fail
       return false;
     }
@@ -649,18 +679,34 @@ export class SQLiteDatabase {
     return true;
   }
 
-  registerNFT(name: string, chainId: number, tokenAddress: string, tokenId: number, ensChainId: number): boolean {
+  registerNFT(name: string, chainId: number, tokenAddress: string, tokenId: number, ensChainId: number, owner: string): boolean {
 
     //first get the base name index, from the supplying chain and the base name
     consoleLog(`registerNFT ${chainId} : ${name} ${getPrimaryName(name)}`);
-    let tokenRow = this.db.prepare('SELECT * FROM names_nft WHERE name = ? AND chain_id = ? AND resolver_chain = ?').get(name, chainId, ensChainId);
+    let tokenRow = this.db.prepare('SELECT * FROM nft_names WHERE token = ? AND chain_id = ? AND resolver_chain = ?').get(tokenAddress, chainId, ensChainId);
 
     if (!tokenRow) {
-      const stmt = this.db.prepare('INSERT INTO names_nft (name, token, chain_id, token_id, resolver_chain) VALUES (?, ?, ?, ?, ?)');
-      stmt.run(name, tokenAddress, chainId, tokenId, ensChainId);
-    } else {
+      //create the NFT token entry
+      const nftNamesStmt = this.db.prepare('INSERT INTO nft_names (token, chain_id, resolver_chain) VALUES (?, ?, ?)');
       // @ts-ignore
-      consoleLog(`registerNFT Existing base ${chainId} : ${baseName} ${ensChainId} ${tokenRow.id} }`);
+      nftNamesStmt.run(tokenAddress, chainId, ensChainId);
+
+      tokenRow = this.db.prepare('SELECT * FROM nft_names WHERE token = ? AND chain_id = ? AND resolver_chain = ?').get(tokenAddress, chainId, ensChainId);
+
+      consoleLog(`Created NFT_NAME for ${name}`);
+    }
+
+    if (tokenRow) {
+      //create row entry
+      const stmt = this.db.prepare('INSERT INTO names (name, token_id, nft_names_index, owner) VALUES (?, ?, ?, ?)');
+      // @ts-ignore
+      stmt.run(name, tokenId, tokenRow.id, owner);
+      consoleLog(`Created name and nft_name for ${name} ${tokenId} ${ensChainId}`);
+
+      //fetch entry
+      let row = this.db.prepare('SELECT * FROM names WHERE name = ?').get(name);
+      consoleLog(`Fetched name ${name} ${JSON.stringify(row)}`);
+    } else {
       return false;
     }
 
@@ -874,6 +920,34 @@ export class SQLiteDatabase {
 
       if (count1 >= 100 && count2 >= 100) {
         break;
+      }
+    }
+  }
+
+  // @ts-ignore
+  dumpEntries() {
+    // dump 100 names with tokenId, 100 without
+    const csv4 = this.db.prepare('SELECT * FROM names ORDER BY id').all();
+    var count1: number = 0;
+    for (const row of csv4) {
+      // @ts-ignore
+      if (count1 < 100) {
+        // @ts-ignore
+        consoleLog(`NAME: ${JSON.stringify(row)}`);
+        count1++;
+        // @ts-ignore
+      }
+    }
+
+    const csv5 = this.db.prepare('SELECT * FROM nft_names ORDER BY id').all();
+    count1 = 0;
+    for (const row of csv5) {
+      // @ts-ignore
+      if (count1 < 100) {
+        // @ts-ignore
+        consoleLog(`NFT_NAME: ${JSON.stringify(row)}`);
+        count1++;
+        // @ts-ignore
       }
     }
   }
