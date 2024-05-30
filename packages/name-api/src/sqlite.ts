@@ -461,7 +461,9 @@ export class SQLiteDatabase {
     if (tokenRow == null) {
       tokenRow = this.db.prepare('SELECT * FROM tokens WHERE name = ? AND resolver_chain = ?').get(getBaseName(name), chainId);
       // @ts-ignore
-      row = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), tokenRow.id);
+      if (tokenRow) {
+        row = this.db.prepare('SELECT * FROM names WHERE name = ? AND tokens_index = ?').get(getPrimaryName(name), tokenRow.id);
+      }
     }
 
     // now get the token row
