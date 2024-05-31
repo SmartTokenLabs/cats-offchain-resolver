@@ -496,26 +496,38 @@ export class SQLiteDatabase {
     return row !== undefined;
   }
 
-  //return db.getNameFromToken(chainid, address, tokenId);
-  getNameFromToken(chainId: number, address: string, tokenId: number): string | null {
+  //ensure this works for NFT entries
+  getNameFromToken(chainId: number, address: string, tokenId: number, ensChainId: number): string | null {
 
-    const tokenRow = this.db.prepare('SELECT id FROM tokens WHERE token = ? AND chain_id = ?').get(address, chainId);
+    // Check NFT indexes
+    let tokenRow = this.db.prepare('SELECT id FROM nft_names WHERE token = ? AND chain_id = ? AND resolver_chain = ?').get(address, chainId, ensChainId);
 
-    // @ts-ignore
-    const baseName = tokenRow.name;
+    //consoleLog(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(tokenRow)}`);
 
-    // now search for the tokenId
-    // @ts-ignore
-    const row = this.db.prepare('SELECT name FROM names WHERE tokens_index = ? AND token_id = ?').get(tokenRow.id, tokenId);
-
-    consoleLog(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(row)}`);
-
-    if (row) {
+    if (tokenRow) {
+      //consoleLog(`getNameFromToken3 ${chainId} ${address} ${tokenId} ${JSON.stringify(tokenRow)}`);
       // @ts-ignore
-      return row.name;
-    } else {
-      return null;
+      let row = this.db.prepare('SELECT name FROM names WHERE token_id = ? AND nft_names_index = ?').get(tokenId, tokenRow.id);
+      if (row) {
+        // @ts-ignore
+        return row.name;
+      }
     }
+
+    tokenRow = this.db.prepare('SELECT * FROM tokens WHERE token = ? AND chain_id = ? AND resolver_chain = ?').get(address, chainId, ensChainId);
+    //consoleLog(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(tokenRow)}`);
+
+    if (tokenRow) {
+      // @ts-ignore
+      let row = this.db.prepare('SELECT name FROM names WHERE tokens_index = ? AND token_id = ?').get(tokenRow.id, tokenId);
+      //consoleLog(`getNameFromToken ${chainId} ${address} ${tokenId} ${JSON.stringify(row)} ${JSON.stringify(tokenRow)}`);
+      if (row) {
+        // @ts-ignore
+        return row.name;
+      }
+    }
+
+    return '';
   }
 
   text(chainId: number, name: string, key: string) {

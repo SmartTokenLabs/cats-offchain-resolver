@@ -222,12 +222,14 @@ export async function createServer() {
 		return { result: `${fetchedName}` };
 	});
 
-	app.get('/name/:chainid/:address/:tokenid', async (request, reply) => {
+	app.get('/name/:chainid/:address/:tokenid/:ensChainId?', async (request, reply) => {
 		const address = request.params.address;
 		const tokenId = request.params.tokenid;
 		const chainId = request.params.chainid;
+		const ensChainId = request.params.ensChainId;
+		const numericEnsChainId: number = Number(ensChainId !== undefined ? ensChainId : chainId);
 		consoleLog("getName Addr: " + address + " tokenid " + tokenId + " chainid " + chainId);
-		return { result: db.getNameFromToken(chainId, address, tokenId) };
+		return { result: db.getNameFromToken(chainId, address, tokenId, numericEnsChainId) };
 	});
 
 	app.get('/addr/:name/:coinType/:chainId', async (request, reply) => {
@@ -637,7 +639,7 @@ export async function createServer() {
 		}
 
 		//Have they already registered this token?
-		const currentName = db.getNameFromToken(chainId, tokenContract, tokenId);
+		const currentName = db.getNameFromToken(chainId, tokenContract, tokenId, numericEnsChainId);
 		if (currentName != null) {
 			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
