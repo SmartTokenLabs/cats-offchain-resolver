@@ -670,7 +670,8 @@ export async function createServer() {
 
 		//Have they already registered this token?
 		const currentName = db.getNameFromToken(chainId, tokenContract, tokenId, numericEnsChainId);
-		if (currentName.length == 0) {
+		consoleLog(`CurrentName: ${currentName} (${currentName.length})`);
+		if (currentName.length > 0) { //already has a name
 			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
 
