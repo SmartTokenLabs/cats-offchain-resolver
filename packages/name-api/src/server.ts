@@ -670,7 +670,7 @@ export async function createServer() {
 
 		//Have they already registered this token?
 		const currentName = db.getNameFromToken(chainId, tokenContract, tokenId, numericEnsChainId);
-		if (currentName != null) {
+		if (currentName.length == 0) {
 			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
 
