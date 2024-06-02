@@ -38,10 +38,12 @@ const CHAIN_DETAILS: Record<number, ChainDetail> = {
 
 // Domains owned by STL, subdomains can be used freely
 const STL_DOMAINS: Record<string, number[]> = {
-    'smartlayer.eth': [1, 5, 11155111],
+    'smartlayer.eth': [1, 5, 11155111, 17000],
     'xnft.eth': [11155111, 17000],
     'thesmartcats.eth': [11155111, 17000],
     'esp32.eth': [11155111, 17000],
+    'cryptopunks.eth': [11155111, 17000],
+    '61cygni.eth': [11155111, 17000],
   };
 
 export function getProvider(useChainId: number): ethers.JsonRpcProvider | null {
@@ -258,6 +260,12 @@ export async function resolveEnsName(baseName: string, hashName: string, chainId
 
     //console.log(`UserAddress: ${ethMainnetAddress} ${userAddress}`);
     return {userAddr: ensAddr, onChainName: resolvingName};
+}
+
+// TODO: Allow dynamically adding domains
+export function isFreeDomain(baseName: string, chainId: number): boolean {
+    let knownDomain = STL_DOMAINS[baseName];
+    return knownDomain && knownDomain.includes(chainId);
 }
 
 export async function userOwnsDomain(baseName: string, domainName: string, applyerAddress: string, chainId: number): Promise<boolean> {
