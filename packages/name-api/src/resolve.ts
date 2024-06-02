@@ -31,12 +31,19 @@ const CHAIN_DETAILS: Record<number, ChainDetail> = {
     80001: { name: "polygon-mumbai", RPCurl: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`, chainId: 80001 },
     137: { name: "polygon-mainnet", RPCurl: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 137 },
     10: { name: "optimism-mainnet", RPCurl: `https://optimism-mainnet.infura.io/v3/${INFURA_KEY}`, chainId: 10 },
+    17000: { name: "holesky", RPCurl: `https://holesky.infura.io/v3/${INFURA_KEY}`, chainId: 17000 },
+    5000: { name: "mantle", RPCurl: `https://rpc.mantle.xyz`, chainId: 5000 },
+    5003: { name: "mantle-testnet", RPCurl: `https://rpc.sepolia.mantle.xyz`, chainId: 5003 },
 };
 
 // Domains owned by STL, subdomains can be used freely
 const STL_DOMAINS: Record<string, number[]> = {
-    'smartlayer.eth': [1, 5, 11155111],
-    'xnft.eth': [11155111]
+    'smartlayer.eth': [1, 5, 11155111, 17000],
+    'xnft.eth': [11155111, 17000],
+    'thesmartcats.eth': [11155111, 17000],
+    'esp32.eth': [11155111, 17000],
+    'cryptopunks.eth': [11155111, 17000],
+    '61cygni.eth': [11155111, 17000],
   };
 
 export function getProvider(useChainId: number): ethers.JsonRpcProvider | null {
@@ -253,6 +260,12 @@ export async function resolveEnsName(baseName: string, hashName: string, chainId
 
     //console.log(`UserAddress: ${ethMainnetAddress} ${userAddress}`);
     return {userAddr: ensAddr, onChainName: resolvingName};
+}
+
+// TODO: Allow dynamically adding domains
+export function isFreeDomain(baseName: string, chainId: number): boolean {
+    let knownDomain = STL_DOMAINS[baseName];
+    return knownDomain && knownDomain.includes(chainId);
 }
 
 export async function userOwnsDomain(baseName: string, domainName: string, applyerAddress: string, chainId: number): Promise<boolean> {

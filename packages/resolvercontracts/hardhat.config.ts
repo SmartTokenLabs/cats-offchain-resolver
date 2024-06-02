@@ -5,8 +5,8 @@ import "@nomiclabs/hardhat-etherscan";
 require('@nomiclabs/hardhat-ethers');
 require('@openzeppelin/hardhat-upgrades');
 
-require("dotenv").config("G:/ensdeploy/.env");
-//require("dotenv").config();
+//require("dotenv").config("G:/ensdeploy/.env");
+require("dotenv").config();
 
 let { PRIVATE_KEY, ETHERSCAN_API_KEY, INFURA_KEY } = process.env;
 
@@ -73,6 +73,10 @@ export default {
     },
     sepolia: {
       url: `https://sepolia.infura.io/v3/${INFURA_KEY}`,
+      accounts: [`${PRIVATE_KEY}`]
+    },
+    holesky: {
+      url: `https://holesky.infura.io/v3/${INFURA_KEY}`,
       accounts: [`${PRIVATE_KEY}`]
     }
   },

@@ -12,7 +12,7 @@ import {
 } from "./constants";
 import fastify from "fastify";
 import fs from "fs";
-import { getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain, CHAIN_ID } from "./resolve";
+import { getBaseName, getProvider, ipfsHashToHex, resolveEnsName, userOwnsDomain, CHAIN_ID, isFreeDomain } from "./resolve";
 import { isIPFS, tokenAvatarRequest } from "./tokenDiscovery";
 import { getTokenBoundAccount } from "./tokenBound";
 import { ethers, ZeroAddress } from "ethers";
@@ -331,9 +331,19 @@ export async function createServer() {
 
 		let baseName = getBaseName(name);
 
-		//first check if name already exists
-		if (db.isBaseNameRegistered(chainId, numericEnsChainId, baseName)) {
-			return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
+		//first check if name already exists as token basename
+		if (db.isBaseNameRegistered(chainId, numericEnsChainId, name)) {
+			return reply.status(403).send({ "fail": `Base name ${name} already registered` });
+		}
+
+		//now check if this is a subdomain, it's not already registered as a token name
+		if (!db.checkAvailable(numericEnsChainId, name)) {
+			return reply.status(403).send({ "fail": "Already registered as an NFT" });
+		}
+
+		// Check someone hasn't registered an independent NFT on this name
+		if (!db.checkNFTNameAvailable(name, numericEnsChainId)) {
+			return reply.status(403).send({ "fail": "Already registered as an NFT" });
 		}
 
 		//consoleLog(`Check DB for tokencontract `);
@@ -370,18 +380,22 @@ export async function createServer() {
 
 			var userOwns = false;
 
-			if (baseName.toLowerCase() === name.toLowerCase()) {
+			if (baseName.toLowerCase() === name.toLowerCase()) { //attempting to register a domain -> token for a basename, this is only allowed if the user owns the domain, otherwise they must use a subdomain
 				consoleLog("Check domain ownership");
 				userOwns = await userOwnsDomain(getBaseName(name), name, applyerAddress, numericChainId);
-			} else {
+			} else { //doesn't own domain, must be a subdomain of one of the free domains
 				consoleLog("Check token ownership");
-				const contractOwner = await contractOwner(numericChainId, tokenContract);
-				consoleLog(`contractOwner ${contractOwner}`);
+				if (isFreeDomain(baseName, numericEnsChainId)) {
+					userOwns = true;
+				} else {
+					const contractOwner = await contractOwner(numericChainId, tokenContract);
+					consoleLog(`contractOwner ${contractOwner}`);
 
-				userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
-					: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
-				// TODO: If no owner, then require a approval signature to create the domain name
-				// Note: We don't have resources to implement this yet
+					userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
+						: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
+					// TODO: If no owner, then require a approval signature to create the domain name
+					// Note: We don't have resources to implement this yet
+				}
 			}
 
 			consoleLog(`OWNS: ${userOwns}`);
@@ -391,7 +405,7 @@ export async function createServer() {
 				return reply.status(200).send({ "result": "pass" });
 			} else {
 				// @ts-ignore
-				return reply.status(403).send({ "fail": "User does not own the NFT or signature is invalid" });
+				return reply.status(403).send({ "fail": `Not allowed to register this domain (${basename}). Use a subdomain of the free domains or register your own ENS` });
 			}
 		} catch (e) {
 			if (lastError.length < 1000) { // don't overflow errors
@@ -425,10 +439,22 @@ export async function createServer() {
 
 		let baseName = getBaseName(name);
 
-		//first check if name already exists
-		if (db.isBaseNameRegistered(chainId, numericEnsChainId, baseName)) {
+		//first check if name already exists as token basename
+		if (db.isBaseNameRegistered(chainId, numericEnsChainId, name)) {
 			consoleLog(`Base name ${baseName} already registered`);
-			//return reply.status(403).send({ "fail": `Base name ${baseName} already registered` });
+			//return reply.status(403).send({ "fail": `Base name ${name} already registered` });
+		}
+
+		//now check if this is a subdomain, it's not already registered as a token name
+		if (!db.checkAvailable(numericEnsChainId, name)) {
+			consoleLog("Already registered as an NFT");
+			//return reply.status(403).send({ "fail": "Already registered as an NFT" });
+		}
+
+		// Check someone hasn't registered an independent NFT on this name
+		if (!db.checkNFTNameAvailable(name, numericEnsChainId)) {
+			consoleLog("Already registered as an NFT (2)");
+			//return reply.status(403).send({ "fail": "Already registered as an NFT" });
 		}
 
 		//consoleLog(`Check DB for tokencontract `);
@@ -464,15 +490,19 @@ export async function createServer() {
 			if (baseName.toLowerCase() === name.toLowerCase()) {
 				consoleLog("Check domain ownership");
 				userOwns = await userOwnsDomain(getBaseName(name), name, applyerAddress, numericChainId);
-			} else {
+			} else { //doesn't own domain, must be a subdomain of one of the free domains
 				consoleLog("Check token ownership");
-				const contractOwner = await contractOwner(numericChainId, tokenContract);
-				consoleLog(`contractOwner ${contractOwner}`);
+				if (isFreeDomain(baseName, numericEnsChainId)) {
+					userOwns = true;
+				} else {
+					const contractOwner = await contractOwner(numericChainId, tokenContract);
+					consoleLog(`contractOwner ${contractOwner}`);
 
-				userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
-					: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
-				// TODO: If no owner, then require a approval signature to create the domain name
-				// Note: We don't have resources to implement this yet
+					userOwns = contractOwner != null ? contractOwner.toLowerCase() === applyerAddress.toLowerCase()
+						: true; // if the contract doesn't have an owner, then allow anyone to create the domain name
+					// TODO: If no owner, then require a approval signature to create the domain name
+					// Note: We don't have resources to implement this yet
+				}
 			}
 
 			consoleLog(`OWNS: ${userOwns}`);
@@ -640,7 +670,8 @@ export async function createServer() {
 
 		//Have they already registered this token?
 		const currentName = db.getNameFromToken(chainId, tokenContract, tokenId, numericEnsChainId);
-		if (currentName != null) {
+		consoleLog(`CurrentName: ${currentName} (${currentName.length})`);
+		if (currentName.length > 0) { //already has a name
 			return reply.status(403).send({ "fail": `Token ${tokenId} already named: ${currentName}` });
 		}
 

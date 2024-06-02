@@ -1,11 +1,12 @@
 const { ethers } = require("hardhat");
 require("dotenv").config();
 
-const { PRIVATE_KEY, PRIVATE_KEY_GOERLI } = process.env;
+const { PRIVATE_KEY, PRIVATE_KEY_GOERLI, PRIVATE_KEY_A20 } = process.env;
 
 const env_keys_required = [
     "PRIVATE_KEY",
-    "PRIVATE_KEY_GOERLI"
+    "PRIVATE_KEY_GOERLI",
+    "PRIVATE_KEY_A20"
 ];
 
 function calcContractAddress(sender, nonce)
@@ -59,6 +60,10 @@ async function createWalletsAndAddresses(provider){
 
     console.log( 'GOERLI address ' , goerliKey.address);
 
+    const a20Key = new ethers.Wallet(PRIVATE_KEY_A20, provider);
+
+    console.log( 'GORLI address ' , a20Key.address);
+
     const { chainId } = await ethers.provider.getNetwork()
 
     console.log( 'Chain Id: ' , chainId);
@@ -76,9 +81,14 @@ async function createWalletsAndAddresses(provider){
     startBalance2 = await ethers.provider.getBalance(goerliKey.address);
     console.log( 'goerli balance ' , ethers.utils.formatEther(startBalance2));
 
+    startBalance2 = await ethers.provider.getBalance(a20Key.address);
+    console.log( 'sep a20 balance ' , ethers.utils.formatEther(startBalance2));
+
+
     return {
         mainDeployKey,
-        goerliKey
+        goerliKey,
+        a20Key
     }
 
 }
