@@ -18,7 +18,6 @@
   },
   "homepage": "https://github.com/TokenScript/",
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^3.0.3",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "@openzeppelin/contracts-upgradeable": "^4.1.0",
@@ -29,8 +28,7 @@
     "chai": "^4.3.4",
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.3.0",
-    "ethers": "^5.2.0",
-    "hardhat": "^2.9.3",
+    "hardhat": "^2.19.5",
     "mocha": "^7.2.0",
     "ts-node": "^10.9.2",
     "typescript": "^4.9.4"
@@ -38,7 +36,7 @@
   "dependencies": {
     "@ensdomains/ens-contracts": "^0.0.8",
     "@ethereum-attestation-service/eas-contracts": "^0.27.1",
-    "@openzeppelin/contracts": "^4.8.2",
+    "@openzeppelin/contracts": "^4.9.6",
     "@tokenscript/attestation": "^0.5.1",
     "dotenv": "^10.0.0",
     "stl-contracts": "^2.3.2",

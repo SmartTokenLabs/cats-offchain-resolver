@@ -1,10 +1,12 @@
 const { ethers } = require("hardhat");
+const { JsonRpcProvider } = ethers;
 const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoerli');
 
 (async ()=>{
     const {
         mainDeployKey,
-        goerliKey
+        goerliKey,
+        a20Key
     } = await createWalletsAndAddresses(ethers.provider);
 
     console.log("Deploy key: " + mainDeployKey.address);
@@ -53,7 +55,7 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
 
     //deploy resolver
     //const CustomResolver = await ethers.getContractFactory("OffchainResolver");
-    //let customResolver = await CustomResolver.connect(goerliKey).deploy(pcTestUri, [localSigner, gatewayPrivate]);
+    //let customResolver = await CustomResolver.connect(a20Key).deploy(prodUrl, [localSigner, gatewayPrivate]);
     //await customResolver.deployed();
 
     const CustomResolver2 = await ethers.getContractFactory("OffchainResolver");
@@ -65,8 +67,8 @@ const { createWalletsAndAddresses, ethersDebugMessages } = require('./inc/libGoe
     console.log(`NAMEHASH: ${xnftNode}`);
 
     //update URL
-    //let updateUrl = await customResolver.connect(goerliKey).updateUrl(localTestUri);
-    //await updateUrl.wait();
+    let updateUrl = await customResolver.connect(goerliKey).updateUrl(localTestUri);
+    await updateUrl.wait();
 
     //set resolver
     //let updateResolverTx = await registry.connect(goerliKey).setResolver(xnftNode, localResolverAddr);
