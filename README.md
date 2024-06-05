@@ -30,7 +30,9 @@ This can take the form of "bringing your own ENS" which does require a single ga
 Base API Route: ```https://ens.main.smartlayer.com```
 
 ```POST``` ```/registertoken/{token chainId}/{token contract}/{proposed domain name}/{signature}/{optional ensChainId}```
+
 ```POST``` ```/register/{chainId}/{name}/{tokenId}/{signature}```
+
 ```POST``` ```/registerNFT/{chainId}/{tokenAddress}/{name}/{tokenId}/{signature}/{optional ensChainId}```
 
 ### Register a token/domain
