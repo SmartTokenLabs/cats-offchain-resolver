@@ -84,6 +84,38 @@ This contract links the ENS name to this Universal NFT resolver service.
 
 Then, simply follow the same directions as above, but your ```{proposed domain name}``` will be shorter - just the name you just registered eg ```jules.eth```.
 
+### Indiviual NFT registration
+
+Then, for each NFT owner they will need to register the token individually like this:
+
+```/register/{chainId}/{name}/{tokenId}/{signature}```
+
+Where the signature is a "sign personal" of the following message:
+
+```Registering your tokenId ${tokenId} name to ${name} on chain ${chainId}```
+
+Eg for the first NFT on the contract, choosing the name "twentyone":
+
+```Registering your tokenId 1 name to twentyone.smartlayer.eth on chain 137```
+
+```https://ens.main.smartlayer.com/register/137/twentyone.smartlayer.eth/0x<CONTRACT ADDRESS>/1/0x123456...1c```
+
+This will register the NFT on the mainnet, and return a response like this:
+
+```{"result":"pass"}```
+
+Eg for the first NFT on the contract:
+
+```https://ens.main.smartlayer.com/register/137/0x<CONTRACT ADDRESS>/1/0x123456...1c```
+
+This will register the NFT on the mainnet, and return a response like this:
+
+```{"result":"pass"}```
+
+or an error message if there was a failure - eg if the domain is taken or if the signature is invalid, the the applyer doesn't own the token.
+
+The address that will be returned from the ENS call will be the TBA [EIP-6551] wallet address for the token.
+
 
 ### Alternative registration for single NFTs
 
