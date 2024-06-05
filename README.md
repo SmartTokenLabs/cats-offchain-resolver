@@ -1,14 +1,113 @@
-# ENS Offchain Resolver
-![CI](https://github.com/ensdomains/offchain-resolver/actions/workflows/main.yml/badge.svg)
+# Universal NFT name resolver service. 
 
+Forked from [ENS Offchain Resolver](https://github.com/ensdomains/offchain-resolver)
 
-This repository contains smart contracts and a node.js gateway server that together allow hosting ENS names offchain using [EIP 3668](https://eips.ethereum.org/EIPS/eip-3668) and [ENSIP 10](https://docs.ens.domains/ens-improvement-proposals/ensip-10-wildcard-resolution).
+- Use your own ENS name or a subdomain of one of ours for your NFT collection.
+- Each NFT can create a subdomain name which links to the NFT's TBA [EIP-6551] wallet.
+- Gas free - creating NFT subdomain is gas free. There is a one-time gas cost for collection owner if you bring-your-own domain.
+- Collection owners - you still own the base ENS and the existing direct ENS address is unaffected.
+
+See an example here: `garfield.thesmartcats.eth`. This will resolve to 
+
+This repository contains smart contracts and a node.js gateway server that together deply a generic service that is focussed on providing offchain ENS names for NFT token collections, that usually resolve to the token's TBA [EIP 6551](https://eips.ethereum.org/EIPS/eip-6551). Offchain ENS is provided by [EIP 3668](https://eips.ethereum.org/EIPS/eip-3668) and [ENSIP 10](https://docs.ens.domains/ens-improvement-proposals/ensip-10-wildcard-resolution).
 
 ## Overview
 
 ENS resolution requests to the resolver implemented in this repository are responded to with a directive to query a gateway server for the answer. The gateway server generates and signs a response, which is sent back to the original resolver for decoding and verification. Full details of this request flow can be found in EIP 3668.
 
 All of this happens transparently in supported clients (such as ethers.js with the ethers-ccip-read-provider plugin, or future versions of ethers.js which will have this functionality built-in).
+
+## Server API
+
+The server API allows Token Contract owners to register their NFT contract into this service. Registration links a basename to a token contract.
+
+For example: NFT contract "CryptoShrews" registers a basename cryptoshrews.eth. Each NFT would then register a name that uses this basename: joe.cryptoshrews.eth, max.cryptoshrews.eth, etc.
+
+This can take the form of "bringing your own ENS" which does require a single gas payment to set the resolver (see below) or simply use a subdomain of one of our provided ENS names, eg "catcollection.smartlayer.eth" - each token would have a subdomain name like "joe.catcollection.smartlayer.eth", "max.catcollection.smartlayer.eth", etc.
+
+### Register a token/domain
+
+The easiest way to begin is to register a domain for you token contract.
+
+Here is a list of curently available domains which you can derive a subdomain from:
+
+#### Mainnet: 
+- smartlayer.eth (More to come!)
+
+#### Sepolia & Holesky:
+- smartlayer.eth
+- thesmartcats.eth
+- xnft.eth
+- esp32.eth
+- cryptopunks.eth
+- 61cygni.eth
+
+## Registering a domain for a token contract using the preset domains
+
+To register a domain using a derivative of the above, you need to use the wallet that is the 'owner()' of the token contract. If there is no owner, then you can use any account to register the domain.
+
+```POST``` ```https://ens.main.smartlayer.com/registertoken/{token chainId}/{token contract}/{proposed domain name}/{signature}/{optional ensChainId}```
+
+If you are registering on mainnet, you can select a different chain for the token, if you register on Holesky or Sepolia, you can only choose a token on that chain.
+
+Eg you have an NFT contract on Polygon you want to register on mainnet:
+
+```https://ens.main.smartlayer.com/registertoken/137/0x<CONTRACT ADDRESS>/wowsignals.smartlayer.eth/0x123456...1c/1```
+
+The signature is a "sign personal" of the following message:
+
+```Attempting to register domain {proposed domain name} name to {token contract} on chain {token chainId}```
+
+in this case:
+
+```Attempting to register domain wowsignals.smartlayer.eth name to 0x<CONTRACT ADDRESS> on chain 137```
+
+## Registering a domain for a token contract using "Bring Your Own ENS"
+
+First register your domain name. Let's use Holesky for this example. Open the ENS app:
+
+https://app.ens.domains
+
+and connect your wallet on Holesky - ensuring you have some Holesky ETH in your wallet.
+
+obtain a name that hasn't been taken.
+
+Once fully registered you will see the record page. Click on the "More" tab:
+
+Now on the "Resolver" section click on the "Edit" button, and paste the universal resolver contract for the chain you are registering on:
+
+Mainnet: 0x70E27fE870a96162b6Ae23CBdB8D76F9F382A809
+Sepolia: 0x155454A5d3252D5bEDc6F4C84177c669E420Ca4D
+HoleSky: 0x2b65f09d672adBEF4F22Cd16d018e157cb778051
+
+This contract links the ENS name to this Universal NFT resolver service.
+
+Then, simply follow the same directions as above, but your ```{proposed domain name}``` will be shorter - just the name you just registered eg ```jules.eth```.
+
+
+### Alternative registration for single NFTs
+
+This can be used where the collection owner hasn't registered a domain.
+
+```/registerNFT/{chainId}/{tokenAddress}/{name}/{tokenId}/{signature}/{optional ensChainId}```
+
+Where the signature is a "sign personal" of the following message:
+
+```Attempting to register NFT ${name} name to ${tokenContract} ${tokenId} on chain ${chainId}```
+
+Eg for the fifteenth NFT on the contract on Holesky (17000), choosing the name "minsc.xnft.eth":
+
+```https://ens.main.smartlayer.com/registerNFT/17000/0x<CONTRACT ADDRESS>/minsc.xnft.eth/15/0x123456...1c```
+
+where the signature is a "sign personal" of the following message:
+
+```Attempting to register NFT minsc.xnft.eth name to 0x<CONTRACT ADDRESS> 15 on chain 17000```
+
+This will register the NFT on the mainnet, and return a response like this:
+
+```{"result":"pass"}```
+
+if successful.
 
 ## [Gateway Server](packages/gateway)
 
