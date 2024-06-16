@@ -7,7 +7,7 @@ Forked from [ENS Offchain Resolver](https://github.com/ensdomains/offchain-resol
 - Gas free - creating NFT subdomain is gas free. There is a one-time gas cost for collection owner if you bring-your-own domain.
 - Collection owners - you still own the base ENS and the existing direct ENS address is unaffected.
 
-See an example here: `garfield.thesmartcats.eth`. This will resolve to 
+See an example here: `garfield.thesmartcats.eth`. This will resolve to 0xa31b751a2240425a28293A52dC1bd176125e11c3 on Polygon
 
 This repository contains smart contracts and a node.js gateway server that together deply a generic service that is focussed on providing offchain ENS names for NFT token collections, that usually resolve to the token's TBA [EIP 6551](https://eips.ethereum.org/EIPS/eip-6551). Offchain ENS is provided by [EIP 3668](https://eips.ethereum.org/EIPS/eip-3668) and [ENSIP 10](https://docs.ens.domains/ens-improvement-proposals/ensip-10-wildcard-resolution).
 
